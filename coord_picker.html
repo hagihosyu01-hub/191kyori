@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>図面 座標取得ツール</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; font-family: system-ui, sans-serif; background: #1e1e1e; color: #eee; }
+  body { display: flex; flex-direction: column; }
+  header {
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+    padding: 8px 10px; background: #2a2a2a; border-bottom: 1px solid #444;
+  }
+  header label { font-size: 13px; color: #bbb; }
+  select, input, button {
+    font-size: 14px; padding: 6px 8px; border-radius: 6px;
+    border: 1px solid #555; background: #333; color: #eee;
+  }
+  button { cursor: pointer; background: #3a6ea5; border-color: #3a6ea5; font-weight: bold; }
+  button.sub { background: #444; border-color: #555; }
+  button:active { filter: brightness(1.2); }
+  #labelInput { width: 120px; }
+  #readout {
+    margin-left: auto; font-size: 15px; font-weight: bold; color: #ffd54f;
+    white-space: nowrap; min-width: 150px; text-align: right;
+  }
+  #stage { position: relative; flex: 1; overflow: hidden; background: #111; touch-action: none; }
+  #mapCanvas { position: absolute; top: 0; left: 0; }
+  #loupe {
+    position: absolute; width: 240px; height: 240px; border-radius: 50%;
+    border: 3px solid #fff; box-shadow: 0 2px 8px rgba(0,0,0,.6);
+    pointer-events: none; display: none; background: #000; z-index: 5;
+  }
+  #hint {
+    position: absolute; bottom: 8px; left: 8px; z-index: 4;
+    font-size: 12px; color: #aaa; background: rgba(0,0,0,.55);
+    padding: 4px 8px; border-radius: 6px; max-width: 70%;
+  }
+  #panel {
+    background: #252525; border-top: 1px solid #444; padding: 8px 10px;
+    display: flex; flex-direction: column; gap: 6px; max-height: 34vh;
+  }
+  #panel .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  #count { font-size: 13px; color: #9ccc65; }
+  textarea {
+    width: 100%; height: 90px; resize: vertical; font-family: monospace;
+    font-size: 13px; background: #1a1a1a; color: #d7ffd7; border: 1px solid #444; border-radius: 6px; padding: 6px;
+  }
+  .toast {
+    position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
+    background: #2e7d32; color: #fff; padding: 8px 16px; border-radius: 8px;
+    z-index: 10; font-size: 14px; opacity: 0; transition: opacity .2s; pointer-events: none;
+  }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<header>
+  <label>図面:
+    <select id="mapSelect"></select>
+  </label>
+  <button class="sub" id="fileBtn">画像を開く</button>
+  <input type="file" id="fileInput" accept="image/*" style="display:none">
+  <label>距離標:
+    <input id="labelInput" placeholder="例: 102k520" list="labelList">
+    <datalist id="labelList"></datalist>
+  </label>
+  <button id="fitBtn" class="sub">全体表示</button>
+  <button id="fullBtn" class="sub">全画面</button>
+  <span id="readout">X: -  Y: -</span>
+</header>
+
+<div id="stage">
+  <canvas id="mapCanvas"></canvas>
+  <canvas id="loupe" width="240" height="240"></canvas>
+  <div id="hint">ホイール/ピンチで拡大・ドラッグで移動・クリック(タップ)で点を登録</div>
+</div>
+
+<div id="panel">
+  <div class="row">
+    <span id="count">登録: 0 点</span>
+    <button id="copyBtn">テキストをコピー</button>
+    <button id="undoBtn" class="sub">直前を取消</button>
+    <button id="clearBtn" class="sub">全消去</button>
+  </div>
+  <textarea id="output" readonly placeholder="ここに「距離標 x y」が貼り付け用で出ます"></textarea>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+  const stage = document.getElementById('stage');
+  const canvas = document.getElementById('mapCanvas');
+  const ctx = canvas.getContext('2d');
+  const loupe = document.getElementById('loupe');
+  const lctx = loupe.getContext('2d');
+  const readout = document.getElementById('readout');
+  const labelInput = document.getElementById('labelInput');
+  const output = document.getElementById('output');
+  const countEl = document.getElementById('count');
+  const mapSelect = document.getElementById('mapSelect');
+  const labelList = document.getElementById('labelList');
+
+  let img = null;
+  let imgName = '';
+  let scale = 1, offX = 0, offY = 0;   // 表示変換
+  const minScaleFactor = 0.05;
+  let points = [];                      // {label, x, y}
+  let cursorImg = null;                 // 現在のカーソル位置(画像px)
+
+  const LOUPE_SIZE = 240, LOUPE_ZOOM = 6;
+
+  // ---- 地図プルダウン (map_01.png 〜 map_46.png) ----
+  (function fillMaps(){
+    const opt0 = document.createElement('option');
+    opt0.value = ''; opt0.textContent = '— 選択 —';
+    mapSelect.appendChild(opt0);
+    for (let i = 1; i <= 46; i++){
+      const name = 'map_' + String(i).padStart(2,'0') + '.png';
+      const o = document.createElement('option');
+      o.value = name; o.textContent = name;
+      mapSelect.appendChild(o);
+    }
+  })();
+
+  function resizeCanvas(){
+    canvas.width = stage.clientWidth;
+    canvas.height = stage.clientHeight;
+    render();
+  }
+  window.addEventListener('resize', resizeCanvas);
+
+  function loadImage(src, name){
+    const im = new Image();
+    im.onload = function(){
+      img = im; imgName = name || '';
+      fitToScreen();
+      toast('読み込み: ' + imgName);
+    };
+    im.onerror = function(){ toast('読み込み失敗: ' + (name||src)); };
+    im.src = src;
+  }
+
+  mapSelect.addEventListener('change', function(){
+    if (mapSelect.value) loadImage(mapSelect.value, mapSelect.value);
+  });
+  document.getElementById('fileBtn').addEventListener('click', ()=> fileInput.click());
+  const fileInput = document.getElementById('fileInput');
+  fileInput.addEventListener('change', function(e){
+    const f = e.target.files[0]; if(!f) return;
+    loadImage(URL.createObjectURL(f), f.name);
+  });
+  // ドラッグ&ドロップ
+  stage.addEventListener('dragover', e=>{ e.preventDefault(); });
+  stage.addEventListener('drop', e=>{
+    e.preventDefault();
+    const f = e.dataTransfer.files[0]; if(!f) return;
+    loadImage(URL.createObjectURL(f), f.name);
+  });
+
+  function fitToScreen(){
+    if(!img) return;
+    const sx = canvas.width / img.naturalWidth;
+    const sy = canvas.height / img.naturalHeight;
+    scale = Math.min(sx, sy) * 0.98;
+    offX = (canvas.width - img.naturalWidth * scale) / 2;
+    offY = (canvas.height - img.naturalHeight * scale) / 2;
+    render();
+  }
+  document.getElementById('fitBtn').addEventListener('click', fitToScreen);
+
+  // 全画面表示の切り替え
+  const fullBtn = document.getElementById('fullBtn');
+  fullBtn.addEventListener('click', function(){
+    if(!document.fullscreenElement){
+      (document.documentElement.requestFullscreen ||
+       document.documentElement.webkitRequestFullscreen ||
+       function(){}).call(document.documentElement);
+    } else {
+      (document.exitFullscreen || document.webkitExitFullscreen || function(){}).call(document);
+    }
+  });
+  document.addEventListener('fullscreenchange', function(){
+    fullBtn.textContent = document.fullscreenElement ? '全画面解除' : '全画面';
+    setTimeout(resizeCanvas, 60);
+  });
+
+  function toImg(px, py){
+    return { x: (px - offX) / scale, y: (py - offY) / scale };
+  }
+
+  function render(){
+    ctx.fillStyle = '#111';
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+    if(!img) return;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(img, offX, offY, img.naturalWidth*scale, img.naturalHeight*scale);
+    // 登録済みマーカー
+    points.forEach(p=>{
+      const sx = offX + p.x*scale, sy = offY + p.y*scale;
+      ctx.strokeStyle = '#ff1744'; ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(sx-8, sy); ctx.lineTo(sx+8, sy);
+      ctx.moveTo(sx, sy-8); ctx.lineTo(sx, sy+8);
+      ctx.stroke();
+      ctx.beginPath(); ctx.arc(sx, sy, 4, 0, Math.PI*2);
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.stroke();
+      if(p.label){
+        ctx.font = '11px sans-serif';
+        const w = ctx.measureText(p.label).width;
+        ctx.fillStyle = 'rgba(0,0,0,.6)';
+        ctx.fillRect(sx+6, sy-16, w+6, 14);
+        ctx.fillStyle = '#fff';
+        ctx.fillText(p.label, sx+9, sy-5);
+      }
+    });
+  }
+
+  function updateLoupe(clientX, clientY){
+    if(!img || !cursorImg){ loupe.style.display='none'; return; }
+    loupe.style.display = 'block';
+    const rect = stage.getBoundingClientRect();
+    let lx = clientX - rect.left + 20;
+    let ly = clientY - rect.top - LOUPE_SIZE - 20;
+    if (ly < 0) ly = clientY - rect.top + 20;
+    if (lx + LOUPE_SIZE > stage.clientWidth) lx = clientX - rect.left - LOUPE_SIZE - 20;
+    loupe.style.left = lx + 'px';
+    loupe.style.top = ly + 'px';
+
+    const srcSize = LOUPE_SIZE / LOUPE_ZOOM;
+    lctx.fillStyle = '#000';
+    lctx.fillRect(0,0,LOUPE_SIZE,LOUPE_SIZE);
+    lctx.imageSmoothingEnabled = false;
+    lctx.drawImage(
+      img,
+      cursorImg.x - srcSize/2, cursorImg.y - srcSize/2, srcSize, srcSize,
+      0, 0, LOUPE_SIZE, LOUPE_SIZE
+    );
+    // 十字
+    lctx.strokeStyle = '#ff1744'; lctx.lineWidth = 1;
+    lctx.beginPath();
+    lctx.moveTo(LOUPE_SIZE/2, 0); lctx.lineTo(LOUPE_SIZE/2, LOUPE_SIZE);
+    lctx.moveTo(0, LOUPE_SIZE/2); lctx.lineTo(LOUPE_SIZE, LOUPE_SIZE/2);
+    lctx.stroke();
+  }
+
+  function setReadout(){
+    if(cursorImg && img &&
+       cursorImg.x>=0 && cursorImg.y>=0 &&
+       cursorImg.x<=img.naturalWidth && cursorImg.y<=img.naturalHeight){
+      readout.textContent = 'X: ' + Math.round(cursorImg.x) + '  Y: ' + Math.round(cursorImg.y);
+    } else {
+      readout.textContent = 'X: -  Y: -';
+    }
+  }
+
+  // ---- ポインタ操作 (マウス/タッチ統一) ----
+  let pointers = new Map();
+  let dragMoved = 0;
+  let lastPan = null;
+  let pinchDist = 0;
+
+  stage.addEventListener('pointerdown', e=>{
+    stage.setPointerCapture(e.pointerId);
+    pointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
+    dragMoved = 0;
+    if(pointers.size === 1){ lastPan = {x:e.clientX, y:e.clientY}; }
+    else if(pointers.size === 2){ pinchDist = currentPinch(); }
+  });
+
+  stage.addEventListener('pointermove', e=>{
+    const rect = stage.getBoundingClientRect();
+    const px = e.clientX - rect.left, py = e.clientY - rect.top;
+    cursorImg = toImg(px, py);
+    setReadout();
+    updateLoupe(e.clientX, e.clientY);
+
+    if(!pointers.has(e.pointerId)) return;
+    const prev = pointers.get(e.pointerId);
+    pointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
+
+    if(pointers.size === 1 && lastPan){
+      const dx = e.clientX - lastPan.x, dy = e.clientY - lastPan.y;
+      dragMoved += Math.abs(dx) + Math.abs(dy);
+      offX += dx; offY += dy;
+      lastPan = {x:e.clientX, y:e.clientY};
+      render();
+    } else if(pointers.size === 2){
+      const nd = currentPinch();
+      if(pinchDist > 0 && nd > 0){
+        const c = pinchCenter();
+        zoomAt(c.x - rect.left, c.y - rect.top, nd / pinchDist);
+        dragMoved += 20;
+      }
+      pinchDist = nd;
+    }
+  });
+
+  function endPointer(e){
+    if(!pointers.has(e.pointerId)) return;
+    const wasSingle = pointers.size === 1;
+    pointers.delete(e.pointerId);
+    if(pointers.size < 2) pinchDist = 0;
+    if(pointers.size === 1){
+      const last = [...pointers.values()][0];
+      lastPan = {x:last.x, y:last.y};
+    } else { lastPan = null; }
+    // クリック(タップ)判定で点を登録
+    if(wasSingle && dragMoved < 6 && img){
+      placePoint();
+    }
+  }
+  stage.addEventListener('pointerup', endPointer);
+  stage.addEventListener('pointercancel', endPointer);
+  stage.addEventListener('pointerleave', ()=>{ loupe.style.display='none'; });
+
+  function currentPinch(){
+    const v = [...pointers.values()];
+    if(v.length<2) return 0;
+    return Math.hypot(v[0].x-v[1].x, v[0].y-v[1].y);
+  }
+  function pinchCenter(){
+    const v = [...pointers.values()];
+    return { x:(v[0].x+v[1].x)/2, y:(v[0].y+v[1].y)/2 };
+  }
+
+  // ホイールズーム
+  stage.addEventListener('wheel', e=>{
+    e.preventDefault();
+    if(!img) return;
+    const rect = stage.getBoundingClientRect();
+    const factor = e.deltaY < 0 ? 1.15 : 1/1.15;
+    zoomAt(e.clientX-rect.left, e.clientY-rect.top, factor);
+  }, {passive:false});
+
+  function zoomAt(cx, cy, factor){
+    if(!img) return;
+    const minScale = Math.min(canvas.width/img.naturalWidth, canvas.height/img.naturalHeight) * minScaleFactor;
+    const newScale = Math.max(minScale, Math.min(40, scale*factor));
+    const before = toImg(cx, cy);
+    scale = newScale;
+    offX = cx - before.x*scale;
+    offY = cy - before.y*scale;
+    render();
+    if(cursorImg) updateLoupeFromCursor(cx, cy);
+  }
+  function updateLoupeFromCursor(cx, cy){
+    const rect = stage.getBoundingClientRect();
+    updateLoupe(cx + rect.left, cy + rect.top);
+  }
+
+  function placePoint(){
+    if(!cursorImg) return;
+    const x = Math.round(cursorImg.x), y = Math.round(cursorImg.y);
+    if(x<0||y<0||x>img.naturalWidth||y>img.naturalHeight){ toast('図面の外です'); return; }
+    const label = labelInput.value.trim();
+    points.push({ label: label, x: x, y: y });
+    autoAdvanceLabel();
+    refreshOutput();
+    render();
+    toast('登録: ' + (label||'(ラベル無)') + ' → ' + x + ', ' + y);
+  }
+
+  // ラベルが「102k500」形式なら100mずつ自動で進める
+  function autoAdvanceLabel(){
+    const m = labelInput.value.trim().match(/^(\d+(?:-\d+)?k)(\d+)$/);
+    if(!m) return;
+    const next = parseInt(m[2],10) + 100;
+    if(next < 1000){
+      labelInput.value = m[1] + String(next).padStart(3,'0');
+    }
+  }
+
+  function refreshOutput(){
+    countEl.textContent = '登録: ' + points.length + ' 点';
+    output.value = points.map(p=> (p.label||'(no-label)') + '\t' + p.x + '\t' + p.y).join('\n');
+  }
+
+  document.getElementById('copyBtn').addEventListener('click', ()=>{
+    if(!points.length){ toast('登録がありません'); return; }
+    output.select();
+    navigator.clipboard.writeText(output.value).then(
+      ()=> toast('コピーしました'),
+      ()=> { document.execCommand('copy'); toast('コピーしました'); }
+    );
+  });
+  document.getElementById('undoBtn').addEventListener('click', ()=>{
+    if(points.length){ points.pop(); refreshOutput(); render(); toast('直前を取消'); }
+  });
+  document.getElementById('clearBtn').addEventListener('click', ()=>{
+    if(points.length && confirm('登録した点をすべて消去しますか？')){
+      points = []; refreshOutput(); render(); toast('全消去');
+    }
+  });
+
+  let toastTimer = null;
+  function toast(msg){
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(()=> t.classList.remove('show'), 1400);
+  }
+
+  resizeCanvas();
+})();
+</script>
+</body>
+</html>

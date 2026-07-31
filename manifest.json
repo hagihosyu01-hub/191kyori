@@ -1,0 +1,16 @@
+{
+  "short_name": "R191距離標",
+  "name": "R191萩保守距離標表示",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    }
+  ],
+  "start_url": "index.html",
+  "background_color": "#f4f7f6",
+  "theme_color": "#ff9800",
+  "display": "standalone",
+  "orientation": "portrait"
+}
