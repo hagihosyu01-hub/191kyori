@@ -3411,7 +3411,7 @@
         }
 
         let drawingHtml = "";
-        if (res.drawing) {
+        if (res.status !== "圏外です" && res.drawing) {
           let fileId = "";
           if (res.drawing.indexOf('/d/') > -1) {
             fileId = res.drawing.split('/d/')[1].split('/')[0];
