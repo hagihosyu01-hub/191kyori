@@ -3438,7 +3438,9 @@
         cameraButtonHtml = '<button onclick="openCamera()" class="btn-camera">📷 カメラを起動 📷</button>';
         fallButtonHtml = '<button onclick="openFallCamera()" class="btn-camera-fall">📷 落下物を撮影 📷</button>';
         patrolButtonHtml = '<button onclick="openPatrol()" class="btn-patrol">' + CAR_SVG + ' 道路点検 ' + CAR_SVG + '</button>';
-        mapButtonHtml = '<button onclick="openMapModal()" class="btn-map">' + PIN_SVG + ' 現在位置を表示 ' + PIN_SVG + '</button>';
+        if (res.status !== "圏外です") {
+          mapButtonHtml = '<button onclick="openMapModal()" class="btn-map">' + PIN_SVG + ' 現在位置を表示 ' + PIN_SVG + '</button>';
+        }
         shareButtonHtml = '<button onclick="shareKP()" class="btn-share">📤 距離標のコピペ 📤</button>';
 
         document.getElementById("status").innerHTML = "R191萩保守管内距離標";
