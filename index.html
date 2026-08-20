@@ -552,6 +552,100 @@
         cursor: pointer;
       }
 
+      /* 距離標から図面ボタン（緑） */
+      .btn-kpsearch {
+        display: block;
+        margin-top: 2.5vw;
+        padding: 2.5vw;
+        background-color: #00897b;
+        color: white;
+        font-size: 5.625vw;
+        font-weight: bold;
+        border-radius: 1.25vw;
+        box-shadow: 0 0.5vw 0.75vw rgba(0,0,0,0.2);
+        border: none;
+        width: 100%;
+        cursor: pointer;
+      }
+
+      /* ===== 距離標入力モーダル ===== */
+      #kp-modal {
+        display: none;
+        position: fixed;
+        top: 0; left: 0;
+        width: 100vw; height: 100vh;
+        background: rgba(0,0,0,0.75);
+        z-index: 9000;
+        align-items: center;
+        justify-content: center;
+      }
+      #kp-modal-box {
+        background: #fff;
+        width: 86vw;
+        max-width: 420px;
+        border-radius: 3vw;
+        padding: 4vw;
+        box-shadow: 0 1vw 3vw rgba(0,0,0,0.4);
+      }
+      #kp-modal-title {
+        font-size: 4.6vw;
+        font-weight: bold;
+        color: #222;
+        text-align: center;
+        margin-bottom: 3vw;
+      }
+      #kp-input-row {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 1.5vw;
+      }
+      #kp-input-row select,
+      #kp-input-row input {
+        font-size: min(6vw, 26px);
+        font-weight: bold;
+        text-align: center;
+        border: 0.5vw solid #bbb;
+        border-radius: 1.5vw;
+        padding: 2vw 1vw;
+        color: #222;
+        background: #fff;
+      }
+      #kp-in-km { width: 34vw; max-width: 150px; }
+      #kp-in-m  { width: 26vw; max-width: 120px; }
+      .kp-unit { font-size: 5.5vw; font-weight: bold; color: #444; }
+      #kp-modal-hint {
+        font-size: 3.4vw;
+        color: #666;
+        text-align: center;
+        margin-top: 2vw;
+      }
+      #kp-modal-msg {
+        min-height: 4.5vw;
+        color: #d32f2f;
+        font-size: 3.6vw;
+        font-weight: bold;
+        text-align: center;
+        margin-top: 1.5vw;
+      }
+      #kp-modal-actions {
+        display: flex;
+        gap: 2.5vw;
+        margin-top: 3vw;
+      }
+      #kp-modal-actions button {
+        flex: 1;
+        padding: 3vw 0;
+        font-size: 4.5vw;
+        font-weight: bold;
+        border: none;
+        border-radius: 1.5vw;
+        cursor: pointer;
+        color: #fff;
+      }
+      #kp-cancel { background: #9e9e9e; }
+      #kp-go     { background: #00897b; }
+
       /* ===== 巡回点検モーダル ===== */
       #patrol-modal {
         display: none;
@@ -825,6 +919,24 @@
         <canvas id="map-canvas"></canvas>
       </div>
       <div id="map-status">読み込み中...</div>
+    </div>
+
+    <!-- 距離標入力モーダル（打ち込んだ距離標の図面を表示） -->
+    <div id="kp-modal">
+      <div id="kp-modal-box">
+        <div id="kp-modal-title">距離標を入力して図面を表示</div>
+        <div id="kp-input-row">
+          <select id="kp-in-km"></select>
+          <span class="kp-unit">k</span>
+          <input id="kp-in-m" type="number" inputmode="numeric" min="0" max="999" placeholder="000">
+        </div>
+        <div id="kp-modal-hint">例：120 k 300 → 120k300 の図面を表示</div>
+        <div id="kp-modal-msg"></div>
+        <div id="kp-modal-actions">
+          <button id="kp-cancel" onclick="closeKpSearch()">キャンセル</button>
+          <button id="kp-go" onclick="kpSearchGo()">図面を表示</button>
+        </div>
+      </div>
     </div>
 
     <!-- カメラモーダル -->
@@ -3395,19 +3507,32 @@
       // 前回の値を記憶する変数（関数の外に追加）
       let lastDisplayedKP = null;
 
+      // 現在のGPS座標を文字列で返す
+      function _latText() { return (currentGpsLat !== null) ? currentGpsLat.toFixed(6) : "---"; }
+      function _lngText() { return (currentGpsLng !== null) ? currentGpsLng.toFixed(6) : "---"; }
+
+      // 圏外表示中は緯度経度の部分だけを書き換える（全体は再描画しない）
+      function _updateOutOfRangeCoords() {
+        const el = document.getElementById("oor-coord");
+        if (!el) return;
+        el.textContent = "緯度 " + _latText() + " / 経度 " + _lngText();
+      }
+
       function showResult(res) {
-        // ★追加：同じKP値なら表示を更新しない
-        if (res.status === lastDisplayedKP) return;
+        // ★同じKP値なら表示を更新しない（圏外中は緯度経度だけリアルタイム更新）
+        if (res.status === lastDisplayedKP) {
+          if (res.status === "圏外です") _updateOutOfRangeCoords();
+          return;
+        }
         lastDisplayedKP = res.status;
         const siteUrl = "https://x.com/hagihosyu";
         latestKiloPost = res.status;
 
         let displayStatus = res.status;
         if (res.status === "圏外です") {
-          const latText = (currentGpsLat !== null) ? currentGpsLat.toFixed(6) : "---";
-          const lngText = (currentGpsLng !== null) ? currentGpsLng.toFixed(6) : "---";
           displayStatus = '圏外<span style="font-size:0.5em;">です</span>' +
-            '<br><span style="font-size:0.3em;">緯度 ' + latText + ' / 経度 ' + lngText + '</span>';
+            '<br><span id="oor-coord" style="font-size:0.3em;">緯度 ' + _latText() +
+            ' / 経度 ' + _lngText() + '</span>';
         }
 
         let drawingHtml = "";
@@ -3432,6 +3557,7 @@
         let cameraButtonHtml = "";
         let fallButtonHtml = "";
         let mapButtonHtml = "";
+        let kpSearchButtonHtml = "";
         let patrolButtonHtml = "";
         const CAR_SVG = '<svg class="car-ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="#ffd11a" d="M5 11l1.3-3.9C6.6 6.2 7.4 5.6 8.3 5.6h7.4c.9 0 1.7.6 2 1.5L19 11l1.4.5c.4.1.6.5.6.9V17c0 .6-.4 1-1 1h-1c-.6 0-1-.4-1-1v-1H6v1c0 .6-.4 1-1 1H4c-.6 0-1-.4-1-1v-4.6c0-.4.2-.8.6-.9L5 11z"/><path fill="#fff3b0" d="M7.6 7.6l-.8 3h10.4l-.8-3c-.1-.4-.5-.7-.95-.7H8.55c-.45 0-.85.3-.95.7z"/><circle cx="7.5" cy="15.5" r="1.5" fill="#333"/><circle cx="16.5" cy="15.5" r="1.5" fill="#333"/></svg>';
         const PIN_SVG = '<svg class="pin-ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="#e53935" d="M12 2c-3.9 0-7 3.1-7 7 0 5.2 7 13 7 13s7-7.8 7-13c0-3.9-3.1-7-7-7z"/><circle cx="12" cy="9" r="2.6" fill="#fff"/></svg>';
@@ -3441,6 +3567,7 @@
         if (res.status !== "圏外です") {
           mapButtonHtml = '<button onclick="openMapModal()" class="btn-map">' + PIN_SVG + ' 現在位置を表示 ' + PIN_SVG + '</button>';
         }
+        kpSearchButtonHtml = '<button onclick="openKpSearch()" class="btn-kpsearch">🔢 距離標から図面 🔢</button>';
         shareButtonHtml = '<button onclick="shareKP()" class="btn-share">📤 距離標のコピペ 📤</button>';
 
         document.getElementById("status").innerHTML = "R191萩保守管内距離標";
@@ -3450,13 +3577,15 @@
           drawingHtml +
           patrolButtonHtml +
           mapButtonHtml +
+          kpSearchButtonHtml +
           cameraButtonHtml +
           fallButtonHtml +
           shareButtonHtml +
           '<a href="' + siteUrl + '" target="_top" class="btn-back">🔗 X.com/萩保守 🔗</a>' +
           '<div class="info-box">' +
-          '<span class="info-title">【いろいろ説明v3.67】</span>' +         
+          '<span class="info-title">【いろいろ説明v3.7】</span>' +         
           '・周囲の環境により5～10m以上の誤差が生じる場合があります。<br>' +
+          '・ver3.7：圏外時の緯度経度がリアルタイム表示になり、写真にも焼き込まれます。LINE送信に緯度経度と地図リンク（押すと地図が開く）を追加。距離標を打ち込んで図面を開けるようにしました（図面表示は通信が必要です）。<br>' +
           '・落下物撮影：処理前→近景→処理後の3枚を撮って、まとめてクラウド（Google Drive）に保存できます。<br>' +
           '・バージョン更新がたまにありますのでインストールしている方は最新版に更新してください。<br>' + 
           '・ver3.6：撮影機能追加⇒写真内に日時と距離標を表示して撮影できます。<br>' +
@@ -3482,7 +3611,7 @@
 
       async function shareKP() {
         let text = latestKiloPost;
-        if (latestKiloPost === "圏外です") text = "R191 圏外";
+        if (latestKiloPost === "圏外です") text = "R191 圏外" + _locLines();
         try {
           if (navigator.share) {
             await navigator.share({ title: "R191萩保守距離標", text: text });
@@ -3501,9 +3630,22 @@
       let lockedKP = null;      // 固定時の距離標
       let camKpTimer = null;    // 下部テキストのリアルタイム更新タイマー
 
-      // 現在有効な距離標（固定中は固定値、それ以外は最新値）
+      // 圏外のときは距離標の代わりに緯度経度を付ける（写真の焼き込み・送信用）
+      function _kpWithCoords(kp) {
+        if (kp !== "圏外です") return kp;
+        return '圏外 ' + _latText() + ',' + _lngText();
+      }
+
+      // ファイル名に使える形へ（圏外時の緯度経度もそのまま残す）
+      function _kpFileName(kp) {
+        return String(kp).replace(/圏外/g, 'OOR')
+                         .replace(/[^a-zA-Z0-9_.\-]+/g, '_')
+                         .replace(/^_+|_+$/g, '');
+      }
+
+      // 現在有効な距離標（固定中は固定値、それ以外は最新値／圏外なら緯度経度）
       function _currentKP() {
-        return (kpLocked && lockedKP !== null) ? lockedKP : latestKiloPost;
+        return (kpLocked && lockedKP !== null) ? lockedKP : _kpWithCoords(latestKiloPost);
       }
 
       // 下部テキストを枠幅に合わせて自動縮小（基準18px、はみ出す場合のみ縮小）
@@ -3541,7 +3683,7 @@
         kpLocked = !kpLocked;
         const btn = document.getElementById('btn-lock');
         if (kpLocked) {
-          lockedKP = latestKiloPost;   // 押した瞬間の距離標で固定
+          lockedKP = _kpWithCoords(latestKiloPost);   // 押した瞬間の距離標（圏外なら緯度経度）で固定
           btn.textContent = '解除';
           btn.classList.add('locked');
         } else {
@@ -3656,7 +3798,15 @@
 
         // 下端に黒帯＋白文字ゴシック1行
         const overlayText = _getOverlayText();
-        const fontSize = 22;
+        const FONT = (px) => `bold ${px}px "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif`;
+        // 圏外時は緯度経度が入って長くなるため、はみ出す場合は自動で縮小
+        let fontSize = 22;
+        ctx.font = FONT(fontSize);
+        const maxTextW = OUT_W - 28;
+        const measuredW = ctx.measureText(overlayText).width;
+        if (measuredW > maxTextW) {
+          fontSize = Math.max(11, Math.floor(fontSize * maxTextW / measuredW));
+        }
         const bandH   = fontSize + 16;
         const bandY   = OUT_H - bandH;
 
@@ -3664,7 +3814,7 @@
         ctx.fillRect(0, bandY, OUT_W, bandH);
 
         ctx.fillStyle = '#ffffff';
-        ctx.font = `bold ${fontSize}px "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif`;
+        ctx.font = FONT(fontSize);
         ctx.textAlign = 'left';
         ctx.textBaseline = 'middle';
         ctx.fillText(overlayText, 14, bandY + bandH / 2);
@@ -3716,7 +3866,7 @@
 
       async function savePhoto() {
         if (!capturedBlob) return;
-        const safeName = _currentKP().replace(/[^a-zA-Z0-9_\-]/g, '');
+        const safeName = _kpFileName(_currentKP());
         const fileName = 'R191_' + safeName + '_hagihosyu.jpg';
         const file = new File([capturedBlob], fileName, { type: 'image/jpeg' });
 
@@ -3747,6 +3897,7 @@
       let mapImg = null;
       let mapCurrentFile = null;
       let mapCurrentKP = null;
+      let mapTargetPoint = null;   // 距離標入力で表示中の目標地点 {label, x, y}
       let mapCurrentLat = null;
       let mapCurrentLng = null;
 
@@ -3755,6 +3906,7 @@
       let currentGpsLng = null;
 
       function openMapModal() {
+        mapTargetPoint = null;   // 現在地モードで開く
         const modal = document.getElementById('map-modal');
         modal.style.display = 'flex';
         document.getElementById('map-status').textContent = '現在地を取得中...';
@@ -3810,6 +3962,7 @@
 
         mapImg = new Image();
         mapImg.onload = function() {
+          if (!mapImg) return;   // 読み込み中に閉じられた場合
           mapCurrentFile = mapFile;
           initMapView(nearestKP);
         };
@@ -3838,7 +3991,10 @@
         let focusY = iH / 2;
 
         const pts = nearestKP._mapPoints;
-        if (pts && pts.length >= 2 && currentGpsLat !== null) {
+        if (mapTargetPoint && mapTargetPoint.x !== null) {
+          focusX = mapTargetPoint.x;
+          focusY = mapTargetPoint.y;
+        } else if (pts && pts.length >= 2 && currentGpsLat !== null) {
           const converted = gpsToPixel(currentGpsLat, currentGpsLng, pts);
           if (converted) { focusX = converted.x; focusY = converted.y; }
         } else if (nearestKP.x !== null) {
@@ -3892,9 +4048,13 @@
         ctx.clearRect(0, 0, iW, iH);
         ctx.drawImage(mapImg, 0, 0);
 
-        // 現在地の赤点を描画
+        // 距離標入力モードは目標地点、それ以外は現在地を描画
         const pts = mapCurrentKP ? mapCurrentKP._mapPoints : [];
-        if (currentGpsLat !== null && pts && pts.length >= 2) {
+        if (mapTargetPoint) {
+          if (mapTargetPoint.x !== null) {
+            drawLocationDot(ctx, mapTargetPoint.x, mapTargetPoint.y, '#1e88e5');
+          }
+        } else if (currentGpsLat !== null && pts && pts.length >= 2) {
           const pos = gpsToPixel(currentGpsLat, currentGpsLng, pts);
           if (pos) {
             drawLocationDot(ctx, pos.x, pos.y);
@@ -3907,7 +4067,7 @@
         canvas.style.transform = `translate(${mapOffX}px, ${mapOffY}px) scale(${mapScale})`;
       }
 
-      function drawLocationDot(ctx, x, y) {
+      function drawLocationDot(ctx, x, y, color) {
         const r = Math.max(3, 8 / mapScale);
         // 外側白リング
         ctx.beginPath();
@@ -3917,7 +4077,7 @@
         // 赤点
         ctx.beginPath();
         ctx.arc(x, y, r, 0, Math.PI * 2);
-        ctx.fillStyle = '#e53935';
+        ctx.fillStyle = color || '#e53935';
         ctx.fill();
         // 十字線
         ctx.strokeStyle = 'white';
@@ -3929,6 +4089,12 @@
       }
 
       function updateMapStatus(focusX, focusY, hasCalibration) {
+        if (mapTargetPoint) {
+          document.getElementById('map-status').textContent =
+            '📌 距離標 ' + mapTargetPoint.label + ' 付近' +
+            (mapTargetPoint.x === null ? '（位置の目安なし）' : '');
+          return;
+        }
         const label = mapCurrentKP ? mapCurrentKP.label : '';
         const mode = hasCalibration ? '📍 現在地表示' : '⚠️ 基準点未設定（中央表示）';
         document.getElementById('map-status').textContent = label + ' | ' + mode;
@@ -3938,6 +4104,111 @@
         document.getElementById('map-modal').style.display = 'none';
         mapImg = null;
         mapCurrentFile = null;
+        mapTargetPoint = null;
+      }
+
+      // ===== 距離標を打ち込んで図面を表示 =====
+      // ラベル（例 "120k300" / "111-2k040"）を {prefix, m} に分解
+      function _parseLabel(label) {
+        const m = String(label).match(/^(\d+(?:-\d+)?)k(\d+)$/);
+        if (!m) return null;
+        return { prefix: m[1], m: parseInt(m[2], 10) };
+      }
+
+      // 図面を持つ距離標の「km（枝番含む）」一覧
+      function _kpPrefixList() {
+        const list = [];
+        MASTER_DATA.forEach(function(p) {
+          if (!p.map) return;
+          const d = _parseLabel(p.label);
+          if (d && list.indexOf(d.prefix) < 0) list.push(d.prefix);
+        });
+        list.sort(function(a, b) {
+          const A = a.split('-').map(Number);
+          const B = b.split('-').map(Number);
+          return (A[0] - B[0]) || ((A[1] || 0) - (B[1] || 0));
+        });
+        return list;
+      }
+
+      function openKpSearch() {
+        const sel = document.getElementById('kp-in-km');
+        if (!sel.options.length) {
+          _kpPrefixList().forEach(function(pref) {
+            const op = document.createElement('option');
+            op.value = pref;
+            op.textContent = pref;
+            sel.appendChild(op);
+          });
+        }
+        // 現在の距離標があれば初期値にする
+        const cur = _parseLabel(latestKiloPost);
+        if (cur) {
+          for (let i = 0; i < sel.options.length; i++) {
+            if (sel.options[i].value === cur.prefix) { sel.selectedIndex = i; break; }
+          }
+          document.getElementById('kp-in-m').value = cur.m;
+        }
+        document.getElementById('kp-modal-msg').textContent = '';
+        document.getElementById('kp-modal').style.display = 'flex';
+      }
+
+      function closeKpSearch() {
+        document.getElementById('kp-modal').style.display = 'none';
+      }
+
+      // 入力された距離標に最も近い（図面を持つ）マスタ点を探す
+      function _findKpPoint(prefix, meter) {
+        let best = null;
+        let bestDiff = Infinity;
+        MASTER_DATA.forEach(function(p) {
+          if (!p.map) return;
+          const d = _parseLabel(p.label);
+          if (!d || d.prefix !== prefix) return;
+          const diff = Math.abs(d.m - meter);
+          if (diff < bestDiff) { bestDiff = diff; best = p; }
+        });
+        return best;
+      }
+
+      function kpSearchGo() {
+        const prefix = document.getElementById('kp-in-km').value;
+        const meter  = parseInt(document.getElementById('kp-in-m').value, 10);
+        const msg    = document.getElementById('kp-modal-msg');
+        if (!prefix) { msg.textContent = 'km を選んでください'; return; }
+        if (isNaN(meter) || meter < 0 || meter > 999) {
+          msg.textContent = 'メートルは 0〜999 で入力してください';
+          return;
+        }
+        const target = _findKpPoint(prefix, meter);
+        if (!target) { msg.textContent = 'その距離標の図面が見つかりません'; return; }
+        closeKpSearch();
+        showMapForPoint(target);
+      }
+
+      // 指定した距離標の図面を開き、その位置に青マーカーを表示
+      function showMapForPoint(p) {
+        const pts = MASTER_DATA.filter(function(q) {
+          return q.map === p.map && q.x !== null && q.y !== null;
+        });
+        let px = null;
+        if (p.x !== null && p.x !== undefined) {
+          px = { x: p.x, y: p.y };
+        } else if (pts.length >= 2) {
+          px = gpsToPixel(p.lat, p.lng, pts);
+        } else if (pts.length === 1) {
+          px = { x: pts[0].x, y: pts[0].y };
+        }
+        mapTargetPoint = {
+          label: p.label,
+          x: px ? px.x : null,
+          y: px ? px.y : null
+        };
+        const base = Object.assign({}, p);
+        base._mapPoints = pts;
+        mapCurrentKP = base;
+        loadAndShowMap(p.map, base);
+        document.getElementById('map-modal-title').textContent = '距離標 ' + p.label + ' の図面';
       }
 
       // ===== タッチ・マウス操作 =====
@@ -4029,6 +4300,16 @@
       })();
 
 
+      // 緯度経度と、押すと地図が開くリンクの行を作る（LINE本文用）
+      function _locLinesFrom(lat, lng) {
+        if (lat === null || lng === null || lat === undefined || lng === undefined) return '';
+        const la = lat.toFixed(6);
+        const ln = lng.toFixed(6);
+        return '\n📌 ' + la + ', ' + ln +
+               '\n🗺️ https://www.google.com/maps/search/?api=1&query=' + la + ',' + ln;
+      }
+      function _locLines() { return _locLinesFrom(currentGpsLat, currentGpsLng); }
+
       // ===== 巡回点検機能 =====
       // ★設定：GASのURLだけをここに入れてください★
       // （LINEのトークンとグループIDはGAS側に書く＝公開ソースに出さないため安全）
@@ -4101,7 +4382,7 @@
         const time = String(now.getHours()).padStart(2,'0') + ':' +
           String(now.getMinutes()).padStart(2,'0');
 
-        const msg = `📍 ${kp}\n⚠️ ${eventName}\n🕐 ${date} ${time}\n👤 ${patrolUser}`;
+        const msg = `📍 ${kp}\n⚠️ ${eventName}\n🕐 ${date} ${time}\n👤 ${patrolUser}` + _locLines();
 
         patrolToast('📡 送信中...', '');
         try {
@@ -4186,7 +4467,7 @@
         closeCamera();                 // カメラを閉じて巡回画面へ戻す（トーストを見せるため）
         patrolToast('📡 送信中...', '');
 
-        const msg = `📍 ${kp}\n⚠️ その他異常\n🕐 ${date} ${time}\n👤 ${user}`;
+        const msg = `📍 ${kp}\n⚠️ その他異常\n🕐 ${date} ${time}\n👤 ${user}` + _locLines();
         try {
           await fetch(PATROL_GAS_URL, {
             method: 'POST',
@@ -4269,6 +4550,8 @@
           blob: capturedBlob,
           url : URL.createObjectURL(capturedBlob),
           kp  : _currentKP() || '不明',
+          lat : currentGpsLat,
+          lng : currentGpsLng,
           date: now.getFullYear() + '/' + String(now.getMonth()+1).padStart(2,'0') + '/' + String(now.getDate()).padStart(2,'0'),
           time: String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0')
         };
@@ -4360,7 +4643,7 @@
         const date   = fallShots[0].date;
         const time   = fallShots[0].time;
         const stamp  = date.replace(/\//g, '') + '_' + time.replace(':', '');
-        const safeKP = kp.replace(/[^a-zA-Z0-9_\-]/g, '');
+        const safeKP = _kpFileName(kp);
         const user   = patrolUser || '';
 
         try {
@@ -4381,7 +4664,7 @@
                 fileName: 'R191_' + safeKP + '_' + stamp + '_' + (i + 1) + '_' + FALL_STEPS[i] + '.jpg',
                 kp: kp, date: date, time: time, user: user,
                 event: '落下物',
-                message: '📍 ' + kp + '\n🧱 落下物（' + FALL_STEPS[i] + ' ' + (i + 1) + '/' + fallShots.length + '）\n🕐 ' + date + ' ' + time + (user ? '\n👤 ' + user : ''),
+                message: '📍 ' + kp + '\n🧱 落下物（' + FALL_STEPS[i] + ' ' + (i + 1) + '/' + fallShots.length + '）\n🕐 ' + date + ' ' + time + (user ? '\n👤 ' + user : '') + _locLinesFrom(fallShots[0].lat, fallShots[0].lng),
                 image: base64,
                 mimeType: 'image/jpeg'
               })

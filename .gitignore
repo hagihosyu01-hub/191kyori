@@ -6,3 +6,6 @@ map_*.png
 
 # 開発用ツール
 coord_picker.html
+
+# ローカル確認用サーバー設定
+.claude/
