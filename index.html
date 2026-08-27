@@ -3583,8 +3583,9 @@
           shareButtonHtml +
           '<a href="' + siteUrl + '" target="_top" class="btn-back">🔗 X.com/萩保守 🔗</a>' +
           '<div class="info-box">' +
-          '<span class="info-title">【いろいろ説明v3.7】</span>' +         
+          '<span class="info-title">【いろいろ説明v3.71】</span>' +         
           '・周囲の環境により5～10m以上の誤差が生じる場合があります。<br>' +
+          '・ver3.71：落下物撮影の画角を自動切替（処理前・処理後＝広角／近景＝標準）。超広角カメラが無い端末では標準のままです。<br>' +
           '・ver3.7：圏外時の緯度経度がリアルタイム表示になり、写真にも焼き込まれます。LINE送信に緯度経度と地図リンク（押すと地図が開く）を追加。距離標を打ち込んで図面を開けるようにしました（図面表示は通信が必要です）。<br>' +
           '・落下物撮影：処理前→近景→処理後の3枚を撮って、まとめてクラウド（Google Drive）に保存できます。<br>' +
           '・バージョン更新がたまにありますのでインストールしている方は最新版に更新してください。<br>' + 
@@ -3733,6 +3734,99 @@
         openCamera('fall');
       }
 
+      // ===== 画角（レンズ）切り替え =====
+      // 落下物モードの画角：処理前=広角 / 近景=標準 / 処理後=広角
+      const FALL_LENS = ['wide', 'normal', 'wide'];
+      let cameraLens = null;         // いま要求している画角 'wide' | 'normal'
+      let cameraWideOk = false;      // 実際に広角にできたか
+      let ultraWideId = null;        // 超広角カメラの deviceId（見つかった場合）
+
+      // 超広角カメラを探す（ラベルは撮影許可後でないと取得できない）
+      async function _findUltraWideId() {
+        if (ultraWideId) return ultraWideId;
+        try {
+          const list = await navigator.mediaDevices.enumerateDevices();
+          const cams = list.filter(function(d) { return d.kind === 'videoinput'; });
+          if (!cams.some(function(d) { return d.label; })) return null;   // 許可前はラベルが空
+          const hit = cams.find(function(d) {
+            return /超広角|ultra[\s-]?wide/i.test(d.label) && !/front|前面/i.test(d.label);
+          });
+          ultraWideId = hit ? hit.deviceId : null;
+        } catch (e) { return null; }
+        return ultraWideId;
+      }
+
+      function _stopCameraStream() {
+        if (cameraStream) {
+          cameraStream.getTracks().forEach(function(t) { t.stop(); });
+          cameraStream = null;
+        }
+      }
+
+      // 指定した画角でカメラを起動（広角が使えない端末は標準のまま）
+      async function _startCameraStream(lens, retried) {
+        _stopCameraStream();
+        let devId = (lens === 'wide') ? await _findUltraWideId() : null;
+
+        const video = { width: { ideal: 1920 }, height: { ideal: 1080 } };
+        if (devId) video.deviceId = { exact: devId };
+        else       video.facingMode = { ideal: 'environment' };
+
+        let stream = null;
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ video: video });
+        } catch (e) {
+          if (!devId) { closeCamera(); return; }
+          devId = null;   // 超広角の指定に失敗 → 標準で開き直す
+          try {
+            stream = await navigator.mediaDevices.getUserMedia({
+              video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }
+            });
+          } catch (e2) { closeCamera(); return; }
+        }
+
+        // 起動待ちの間に閉じられていたら破棄する
+        if (document.getElementById('camera-modal').style.display !== 'flex') {
+          stream.getTracks().forEach(function(t) { t.stop(); });
+          return;
+        }
+
+        cameraStream = stream;
+        cameraLens = lens;
+        cameraWideOk = !!devId;
+        document.getElementById('camera-video').srcObject = stream;
+
+        // 初回は許可前でラベルが読めず超広角を探せないため、許可後に一度だけ探し直す
+        if (lens === 'wide' && !devId && !retried) {
+          const id2 = await _findUltraWideId();
+          if (id2) { _startCameraStream(lens, true); return; }
+        }
+
+        // 超広角カメラが無い端末でも、ズームが使えれば最小倍率＝いちばん広い画角にする
+        const track = stream.getVideoTracks()[0];
+        if (!devId && track && track.getCapabilities) {
+          const caps = track.getCapabilities() || {};
+          if (caps.zoom) {
+            const z = (lens === 'wide')
+              ? caps.zoom.min
+              : Math.min(Math.max(1, caps.zoom.min), caps.zoom.max);
+            try {
+              await track.applyConstraints({ advanced: [{ zoom: z }] });
+              if (lens === 'wide' && caps.zoom.min < 1) cameraWideOk = true;
+            } catch (e) {}
+          }
+        }
+        if (cameraMode === 'fall') _fallUpdateBadge();
+      }
+
+      // 落下物モードで、いまの工程に合った画角へ切り替える
+      function _applyFallLens() {
+        if (cameraMode !== 'fall') return;
+        const want = FALL_LENS[fallStep] || 'normal';
+        if (want === cameraLens) return;
+        _startCameraStream(want);
+      }
+
       function openCamera(patrol) {
         // 後方互換：true が渡された場合は 'patrol' 扱い
         cameraMode = (patrol === true) ? 'patrol' : (patrol || 'normal');
@@ -3759,18 +3853,7 @@
         document.documentElement.appendChild(modal);
         modal.style.display = 'flex';
 
-        navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: { ideal: 'environment' },
-            width:  { ideal: 1920 },
-            height: { ideal: 1080 }
-          }
-        }).then(function(stream) {
-          cameraStream = stream;
-          document.getElementById('camera-video').srcObject = stream;
-        }).catch(function(err) {
-          closeCamera();
-        });
+        _startCameraStream(cameraMode === 'fall' ? FALL_LENS[fallStep] : 'normal');
       }
 
       function capturePhoto() {
@@ -3862,6 +3945,7 @@
         document.getElementById('btn-patrol-send').style.display = 'none';
         document.getElementById('btn-fall-next').style.display = 'none';
         _startCamKpTimer();   // ライブに戻るため更新再開
+        _applyFallLens();     // 工程に合った画角（処理前・処理後=広角／近景=標準）へ
       }
 
       async function savePhoto() {
@@ -4424,10 +4508,9 @@
           if (el) el.style.display = 'none';
         });
         _fallClearShots();
-        if (cameraStream) {
-          cameraStream.getTracks().forEach(function(t) { t.stop(); });
-          cameraStream = null;
-        }
+        _stopCameraStream();
+        cameraLens = null;
+        cameraWideOk = false;
         capturedBlob = null;
         const modal = document.getElementById('camera-modal');
         modal.style.display = 'none';
@@ -4520,7 +4603,8 @@
         const title = document.getElementById('fall-step-title');
         const count = document.getElementById('fall-step-count');
         if (!title || !count) return;
-        title.textContent = '落下物：' + FALL_STEPS[fallStep];
+        const lensName = (FALL_LENS[fallStep] === 'wide' && cameraWideOk) ? '広角' : '標準';
+        title.textContent = '落下物：' + FALL_STEPS[fallStep] + '（' + lensName + '）';
         count.textContent = (fallRetakeIndex !== null)
           ? '撮り直し中'
           : (fallStep + 1) + ' / ' + FALL_STEPS.length + ' 枚目';
