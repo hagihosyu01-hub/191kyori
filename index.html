@@ -3583,8 +3583,9 @@
           shareButtonHtml +
           '<a href="' + siteUrl + '" target="_top" class="btn-back">🔗 X.com/萩保守 🔗</a>' +
           '<div class="info-box">' +
-          '<span class="info-title">【いろいろ説明v3.71】</span>' +         
+          '<span class="info-title">【いろいろ説明v3.72】</span>' +         
           '・周囲の環境により5～10m以上の誤差が生じる場合があります。<br>' +
+          '・ver3.72：落下物は1枚目を撮った瞬間の距離標で3枚とも固定。LINE送信・ファイル名・地図リンクも同じ値にそろえました。<br>'  +
           '・ver3.71：落下物撮影の画角を自動切替（処理前・処理後＝広角／近景＝標準）。超広角カメラが無い端末では標準のままです。<br>' +
           '・ver3.7：圏外時の緯度経度がリアルタイム表示になり、写真にも焼き込まれます。LINE送信に緯度経度と地図リンク（押すと地図が開く）を追加。距離標を打ち込んで図面を開けるようにしました（図面表示は通信が必要です）。<br>' +
           '・落下物撮影：処理前→近景→処理後の3枚を撮って、まとめてクラウド（Google Drive）に保存できます。<br>' +
@@ -3626,6 +3627,9 @@
       // ===== カメラ機能 =====
       let cameraStream = null;
       let capturedBlob = null;
+      let capturedKP = null;    // 撮影した瞬間の距離標（写真に焼き込んだ値）
+      let capturedLat = null;   // 撮影した瞬間の緯度
+      let capturedLng = null;   // 撮影した瞬間の経度
       let cameraMode = 'normal'; // 'normal'=通常撮影 / 'patrol'=その他異常(巡回送信) / 'fall'=落下物3枚撮影
       let kpLocked = false;     // 距離標を固定中か
       let lockedKP = null;      // 固定時の距離標
@@ -3860,6 +3864,15 @@
         const video  = document.getElementById('camera-video');
         const canvas = document.getElementById('camera-canvas');
 
+        // 落下物の1枚目を撮った瞬間に距離標を固定（残り2枚も同じ距離標にする）
+        const shotIdx = (fallRetakeIndex !== null) ? fallRetakeIndex : fallStep;
+        if (cameraMode === 'fall' && shotIdx === 0 && !kpLocked) toggleKpLock();
+
+        // 写真に焼き込む距離標＝送信・ファイル名にも使う値
+        capturedKP = _currentKP();
+        capturedLat = currentGpsLat;
+        capturedLng = currentGpsLng;
+
         const OUT_W = 1280;
         const OUT_H = 960;
         canvas.width  = OUT_W;
@@ -3934,6 +3947,9 @@
 
       function retakePhoto() {
         capturedBlob = null;
+        capturedKP = null;
+        capturedLat = null;
+        capturedLng = null;
         document.getElementById('camera-video').style.display = 'block';
         document.getElementById('camera-canvas').style.display = 'none';
         document.getElementById('crop-guide').style.display = 'block';
@@ -4512,6 +4528,9 @@
         cameraLens = null;
         cameraWideOk = false;
         capturedBlob = null;
+        capturedKP = null;
+        capturedLat = null;
+        capturedLng = null;
         const modal = document.getElementById('camera-modal');
         modal.style.display = 'none';
         document.body.appendChild(modal);
@@ -4530,7 +4549,9 @@
       // 「その他異常」：撮影した写真＋距離標等をGAS経由でLINE送信
       async function patrolSendPhoto() {
         if (!capturedBlob) return;
-        const kp   = _currentKP() || '不明';   // 距離標固定中はその値
+        const kp   = capturedKP || _currentKP() || '不明';   // 写真に焼き込んだ距離標
+        const shotLat = (capturedLat !== null) ? capturedLat : currentGpsLat;
+        const shotLng = (capturedLng !== null) ? capturedLng : currentGpsLng;
         const now  = new Date();
         const date = now.getFullYear() + '/' +
           String(now.getMonth()+1).padStart(2,'0') + '/' +
@@ -4550,7 +4571,7 @@
         closeCamera();                 // カメラを閉じて巡回画面へ戻す（トーストを見せるため）
         patrolToast('📡 送信中...', '');
 
-        const msg = `📍 ${kp}\n⚠️ その他異常\n🕐 ${date} ${time}\n👤 ${user}` + _locLines();
+        const msg = `📍 ${kp}\n⚠️ その他異常\n🕐 ${date} ${time}\n👤 ${user}` + _locLinesFrom(shotLat, shotLng);
         try {
           await fetch(PATROL_GAS_URL, {
             method: 'POST',
@@ -4633,16 +4654,16 @@
         fallShots[idx] = {
           blob: capturedBlob,
           url : URL.createObjectURL(capturedBlob),
-          kp  : _currentKP() || '不明',
-          lat : currentGpsLat,
-          lng : currentGpsLng,
+          kp  : capturedKP || _currentKP() || '不明',
+          lat : (capturedLat !== null) ? capturedLat : currentGpsLat,
+          lng : (capturedLng !== null) ? capturedLng : currentGpsLng,
           date: now.getFullYear() + '/' + String(now.getMonth()+1).padStart(2,'0') + '/' + String(now.getDate()).padStart(2,'0'),
           time: String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0')
         };
         capturedBlob = null;
-
-        // 1枚目を撮った時点で距離標を固定（3枚とも同じ距離標にするため）
-        if (idx === 0 && !kpLocked) toggleKpLock();
+        capturedKP = null;
+        capturedLat = null;
+        capturedLng = null;
 
         if (fallRetakeIndex !== null) {   // 撮り直し完了 → 確認画面へ戻る
           fallRetakeIndex = null;
