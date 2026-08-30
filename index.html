@@ -334,7 +334,10 @@
       /* 上部の手順バッジ（処理前 → 近景 → 処理後） */
       #fall-step-badge {
         position: absolute;
-        top: 16px; left: 16px;
+        top: 16px; left: 50%;
+        transform: translateX(-50%);
+        text-align: center;
+        white-space: nowrap;
         display: none;
         background: rgba(232,89,12,0.92);
         color: #fff;
@@ -355,7 +358,7 @@
       /* 撮影済みサムネの列（ライブ中に見える） */
       #fall-thumbs {
         position: absolute;
-        top: 70px; left: 16px;
+        top: 80px; left: 16px;
         display: none;
         flex-direction: column;
         gap: 6px;
@@ -450,6 +453,28 @@
       }
       #fall-toast.ok  { background: rgba(13,143,63,0.95); }
       #fall-toast.err { background: rgba(211,47,47,0.95); }
+
+      #btn-torch {
+        position: absolute;
+        top: 16px; left: 16px;
+        width: 52px; height: 52px;
+        border-radius: 50%;
+        background: rgba(0,0,0,0.55);
+        border: 2px solid #fff;
+        color: #fff;
+        font-size: 24px;
+        cursor: pointer;
+        display: none;          /* 対応端末でのみ表示 */
+        align-items: center;
+        justify-content: center;
+        z-index: 13;
+        line-height: 1;
+      }
+      #btn-torch.on {
+        background: #ffd11a;
+        border-color: #fff;
+        box-shadow: 0 0 14px rgba(255,209,26,0.9);
+      }
 
       #camera-close {
         position: absolute;
@@ -980,6 +1005,7 @@
       </div>
 
       <div id="fall-toast"></div>
+      <button id="btn-torch" onclick="toggleTorch()" title="ライト" aria-label="ライトを点ける">🔦</button>
       <button id="camera-close" onclick="closeCamera()">✕</button>
     </div>
 
@@ -3583,8 +3609,9 @@
           shareButtonHtml +
           '<a href="' + siteUrl + '" target="_top" class="btn-back">🔗 X.com/萩保守 🔗</a>' +
           '<div class="info-box">' +
-          '<span class="info-title">【いろいろ説明v3.72】</span>' +         
+          '<span class="info-title">【いろいろ説明v3.73】</span>' +         
           '・周囲の環境により5～10m以上の誤差が生じる場合があります。<br>' +
+          '・ver3.73：撮影中にライト（懐中電灯）のON/OFFができます（対応端末のみ）。写真に焼き込む文字から日時を外しました。<br>' +
           '・ver3.72：落下物は1枚目を撮った瞬間の距離標で3枚とも固定。LINE送信・ファイル名・地図リンクも同じ値にそろえました。<br>'  +
           '・ver3.71：落下物撮影の画角を自動切替（処理前・処理後＝広角／近景＝標準）。超広角カメラが無い端末では標準のままです。<br>' +
           '・ver3.7：圏外時の緯度経度がリアルタイム表示になり、写真にも焼き込まれます。LINE送信に緯度経度と地図リンク（押すと地図が開く）を追加。距離標を打ち込んで図面を開けるようにしました（図面表示は通信が必要です）。<br>' +
@@ -3708,20 +3735,11 @@
         if (btn) { btn.textContent = '距離標固定'; btn.classList.remove('locked'); }
       }
 
-      function _getDateStr() {
-        const now = new Date();
-        const date = now.getFullYear() + '/' +
-          String(now.getMonth()+1).padStart(2,'0') + '/' +
-          String(now.getDate()).padStart(2,'0');
-        const time = String(now.getHours()).padStart(2,'0') + ':' +
-          String(now.getMinutes()).padStart(2,'0');
-        return date + '_' + time;
-      }
-
       function _getOverlayText() {
         // 落下物モードは工程名（処理前／近景／処理後）を焼き込む
+        // 日時は焼き込まない（写真のプロパティとファイル名には残ります）
         const stage = (cameraMode === 'fall') ? ('_' + FALL_STEPS[fallStep]) : '';
-        return '--R191_' + _currentKP() + stage + '_' + _getDateStr() + '_hagihosyukouji--';
+        return '--R191_' + _currentKP() + stage + '_hagihosyukouji--';
       }
 
       // 巡回点検「その他異常」用：撮影後にLINE送信モードでカメラを開く
@@ -3736,6 +3754,47 @@
         fallRetakeIndex = null;
         fallGroupId = 'FO' + Date.now() + '_' + Math.floor(Math.random() * 1000);
         openCamera('fall');
+      }
+
+      // ===== ライト（トーチ）のON/OFF =====
+      let torchOn = false;
+
+      function _torchTrack() {
+        return cameraStream ? cameraStream.getVideoTracks()[0] : null;
+      }
+
+      // この端末・このカメラでライトが使えるか
+      function _torchSupported() {
+        const t = _torchTrack();
+        if (!t || !t.getCapabilities) return false;
+        try { return !!(t.getCapabilities() || {}).torch; } catch (e) { return false; }
+      }
+
+      async function _applyTorch(on) {
+        const t = _torchTrack();
+        if (!t || !_torchSupported()) return false;
+        try {
+          await t.applyConstraints({ advanced: [{ torch: !!on }] });
+          return true;
+        } catch (e) { return false; }
+      }
+
+      async function toggleTorch() {
+        const next = !torchOn;
+        const ok = await _applyTorch(next);
+        if (!ok) return;
+        torchOn = next;
+        _updateTorchButton();
+      }
+
+      // ライトボタンの表示・状態を更新（ライブ映像のときだけ出す）
+      function _updateTorchButton() {
+        const btn = document.getElementById('btn-torch');
+        if (!btn) return;
+        const live = document.getElementById('btn-capture').style.display !== 'none';
+        btn.style.display = (live && _torchSupported()) ? 'flex' : 'none';
+        btn.classList.toggle('on', torchOn);
+        btn.setAttribute('aria-label', torchOn ? 'ライトを消す' : 'ライトを点ける');
       }
 
       // ===== 画角（レンズ）切り替え =====
@@ -3761,6 +3820,7 @@
       }
 
       function _stopCameraStream() {
+        if (torchOn) _applyTorch(false);
         if (cameraStream) {
           cameraStream.getTracks().forEach(function(t) { t.stop(); });
           cameraStream = null;
@@ -3821,6 +3881,11 @@
           }
         }
         if (cameraMode === 'fall') _fallUpdateBadge();
+
+        // ライト：点けたままレンズを切り替えたときは点け直す
+        if (torchOn) await _applyTorch(true);
+        _updateTorchButton();
+        setTimeout(_updateTorchButton, 600);   // 対応状況が遅れて分かる端末むけ
       }
 
       // 落下物モードで、いまの工程に合った画角へ切り替える
@@ -3852,6 +3917,8 @@
         document.getElementById('fall-thumbs').style.display = (cameraMode === 'fall') ? 'flex' : 'none';
         if (cameraMode === 'fall') { _fallUpdateBadge(); _fallUpdateThumbs(); }
         capturedBlob = null;
+        torchOn = false;
+        _updateTorchButton();
         _startCamKpTimer();   // 下部テキストをリアルタイム更新開始
 
         document.documentElement.appendChild(modal);
@@ -3917,6 +3984,7 @@
 
         // プレビュー表示に切り替え
         _stopCamKpTimer();   // 撮影値で確定するため更新停止
+        document.getElementById('btn-torch').style.display = 'none';
         video.style.display = 'none';
         canvas.style.display = 'block';
         document.getElementById('crop-guide').style.display = 'none';
@@ -3961,6 +4029,7 @@
         document.getElementById('btn-patrol-send').style.display = 'none';
         document.getElementById('btn-fall-next').style.display = 'none';
         _startCamKpTimer();   // ライブに戻るため更新再開
+        _updateTorchButton();
         _applyFallLens();     // 工程に合った画角（処理前・処理後=広角／近景=標準）へ
       }
 
@@ -4525,6 +4594,8 @@
         });
         _fallClearShots();
         _stopCameraStream();
+        torchOn = false;
+        _updateTorchButton();
         cameraLens = null;
         cameraWideOk = false;
         capturedBlob = null;
