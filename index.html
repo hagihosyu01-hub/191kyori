@@ -3617,8 +3617,9 @@
           shareButtonHtml +
           '<a href="' + siteUrl + '" target="_top" class="btn-back">🔗 X.com/萩保守 🔗</a>' +
           '<div class="info-box">' +
-          '<span class="info-title">【いろいろ説明v3.74】</span>' +         
+          '<span class="info-title">【いろいろ説明v3.75】</span>' +         
           '・周囲の環境により5～10m以上の誤差が生じる場合があります。<br>' +
+          '・ver3.75：写真にExif（撮影日時・GPSの緯度経度・距離標）を入れるようにしました。<br>' +
           '・ver3.74：落下物の3枚に SHA-256（改ざん検出用のハッシュ）を付けて保存します。確認画面にも表示されます。<br>' +
           '・ver3.73：撮影中にライト（懐中電灯）のON/OFFができます（対応端末のみ）。写真に焼き込む文字から日時を外しました。<br>' +
           '・ver3.72：落下物は1枚目を撮った瞬間の距離標で3枚とも固定。LINE送信・ファイル名・地図リンクも同じ値にそろえました。<br>'  +
@@ -4019,7 +4020,24 @@
           document.getElementById('btn-fall-next').style.display = 'none';
         }
 
-        canvas.toBlob(function(blob) { capturedBlob = blob; }, 'image/jpeg', 0.92);
+        // Exif（撮影日時・GPS・距離標）を書き込んでから確定する
+        const shotDate  = new Date();
+        const shotStage = (cameraMode === 'fall') ? FALL_STEPS[fallStep] : '';
+        const shotKP    = capturedKP;
+        const shotLat   = capturedLat;
+        const shotLng   = capturedLng;
+        canvas.toBlob(function(blob) {
+          _jpegWithExif(blob, {
+            date: shotDate,
+            lat:  shotLat,
+            lng:  shotLng,
+            width: OUT_W,
+            height: OUT_H,
+            description: ('R191 ' + _kpFileName(shotKP || '') +
+                          (shotStage ? ' ' + (STAGE_EN[shotStage] || '') : '')),
+            comment: ('R191 ' + (shotKP || '') + (shotStage ? ' ' + shotStage : ''))
+          }).then(function(b) { capturedBlob = b; });
+        }, 'image/jpeg', 0.92);
       }
 
       function retakePhoto() {
@@ -4681,6 +4699,160 @@
             .map(function(b) { return b.toString(16).padStart(2, '0'); })
             .join('');
         } catch (e) { return null; }
+      }
+
+      // ===== Exif（撮影日時・GPS・距離標）の書き込み =====
+      // canvasで作ったJPEGにはExifが入らないため、APP1セグメントを自前で組んで差し込む
+      const EXIF_MAKE     = 'R191kyori';
+      const EXIF_MODEL    = 'PWA Camera';
+      const EXIF_SOFTWARE = 'R191kyori PWA ver3.75';
+      const STAGE_EN = { '処理前': 'before', '近景': 'closeup', '処理後': 'after' };
+
+      function _exifDateStr(d, utc) {
+        const p = (n) => String(n).padStart(2, '0');
+        return (utc
+          ? [d.getUTCFullYear(), p(d.getUTCMonth() + 1), p(d.getUTCDate())]
+          : [d.getFullYear(),    p(d.getMonth() + 1),    p(d.getDate())]).join(':')
+          + ' ' +
+          (utc
+          ? [p(d.getUTCHours()), p(d.getUTCMinutes()), p(d.getUTCSeconds())]
+          : [p(d.getHours()),    p(d.getMinutes()),    p(d.getSeconds())]).join(':');
+      }
+
+      // Exifの APP1 セグメント（FFE1〜）を作る
+      function _exifApp1(info) {
+        const put16 = (a, v) => { a.push((v >> 8) & 0xff, v & 0xff); };
+        const put32 = (a, v) => { a.push((v >>> 24) & 0xff, (v >>> 16) & 0xff, (v >>> 8) & 0xff, v & 0xff); };
+        const ascii = (str) => {
+          const a = [];
+          for (let i = 0; i < str.length; i++) {
+            const c = str.charCodeAt(i);
+            a.push(c < 128 ? c : 63);   // ASCII以外は '?' に置き換え（規格上ASCIIのみ）
+          }
+          a.push(0);
+          return a;
+        };
+        const utf16be = (str) => {
+          const a = [];
+          for (let i = 0; i < str.length; i++) { const c = str.charCodeAt(i); a.push((c >> 8) & 0xff, c & 0xff); }
+          return a;
+        };
+        const rational = (pairs) => { const a = []; pairs.forEach(function(q) { put32(a, q[0]); put32(a, q[1]); }); return a; };
+        const dmsPairs = (deg) => {
+          const d  = Math.floor(deg);
+          const mf = (deg - d) * 60;
+          const m  = Math.floor(mf);
+          const sc = Math.round((mf - m) * 60 * 10000);
+          return [[d, 1], [m, 1], [sc, 10000]];
+        };
+
+        const eASCII = (tag, str) => { const b = ascii(str); return { tag: tag, type: 2, count: b.length, bytes: b }; };
+        const eSHORT = (tag, v) => { const b = []; put16(b, v); return { tag: tag, type: 3, count: 1, bytes: b }; };
+        const eLONG  = (tag, v) => { const b = []; put32(b, v); return { tag: tag, type: 4, count: 1, bytes: b }; };
+        const eBYTE  = (tag, b) => ({ tag: tag, type: 1, count: b.length, bytes: b });
+        const eUNDEF = (tag, b) => ({ tag: tag, type: 7, count: b.length, bytes: b });
+        const eRAT   = (tag, pairs) => ({ tag: tag, type: 5, count: pairs.length, bytes: rational(pairs) });
+
+        // IFDを1つ組み立てる（ifdStart は TIFFヘッダ先頭からの位置）
+        const buildIfd = (entries, ifdStart) => {
+          const head = [], data = [];
+          const dataStart = ifdStart + 2 + entries.length * 12 + 4;
+          put16(head, entries.length);
+          entries.forEach(function(e) {
+            put16(head, e.tag);
+            put16(head, e.type);
+            put32(head, e.count);
+            if (e.bytes.length <= 4) {
+              const b = e.bytes.slice();
+              while (b.length < 4) b.push(0);
+              for (let i = 0; i < 4; i++) head.push(b[i]);
+            } else {
+              put32(head, dataStart + data.length);
+              for (let i = 0; i < e.bytes.length; i++) data.push(e.bytes[i]);
+              if (data.length % 2) data.push(0);   // 2バイト境界にそろえる
+            }
+          });
+          put32(head, 0);   // 次のIFDなし
+          return head.concat(data);
+        };
+
+        const dt     = info.date || new Date();
+        const dtStr  = _exifDateStr(dt, false);
+        const hasGps = (typeof info.lat === 'number' && typeof info.lng === 'number' &&
+                        isFinite(info.lat) && isFinite(info.lng));
+
+        // --- Exif IFD（タグ番号の昇順に並べる） ---
+        const exifEntries = [
+          eUNDEF(0x9000, [0x30, 0x32, 0x33, 0x30]),   // ExifVersion 0230
+          eASCII(0x9003, dtStr),                       // DateTimeOriginal（撮影日時）
+          eASCII(0x9004, dtStr),                       // DateTimeDigitized
+          eUNDEF(0x9101, [1, 2, 3, 0]),                // ComponentsConfiguration YCbCr
+          eUNDEF(0x9286, [0x55, 0x4E, 0x49, 0x43, 0x4F, 0x44, 0x45, 0x00]
+                          .concat(utf16be(info.comment || ''))),   // UserComment(UNICODE)
+          eUNDEF(0xA000, [0x30, 0x31, 0x30, 0x30]),   // FlashpixVersion 0100
+          eSHORT(0xA001, 1),                           // ColorSpace = sRGB
+          eLONG(0xA002, info.width  || 0),             // PixelXDimension
+          eLONG(0xA003, info.height || 0)              // PixelYDimension
+        ];
+
+        // --- GPS IFD ---
+        const gpsEntries = hasGps ? [
+          eBYTE(0x0000, [2, 3, 0, 0]),                                     // GPSVersionID
+          eASCII(0x0001, info.lat >= 0 ? 'N' : 'S'),
+          eRAT(0x0002, dmsPairs(Math.abs(info.lat))),
+          eASCII(0x0003, info.lng >= 0 ? 'E' : 'W'),
+          eRAT(0x0004, dmsPairs(Math.abs(info.lng))),
+          eRAT(0x0007, [[dt.getUTCHours(), 1], [dt.getUTCMinutes(), 1], [dt.getUTCSeconds(), 1]]),
+          eASCII(0x001D, _exifDateStr(dt, true).split(' ')[0])             // GPSDateStamp(UTC)
+        ] : [];
+
+        // --- IFD0（ExifとGPSの位置を指すので、長さを先に確定してから組み直す） ---
+        const ifd0Entries = (exifPtr, gpsPtr) => {
+          const list = [
+            eASCII(0x010E, info.description || ''),   // ImageDescription
+            eASCII(0x010F, EXIF_MAKE),
+            eASCII(0x0110, EXIF_MODEL),
+            eSHORT(0x0112, 1),                        // Orientation = 通常
+            eRAT(0x011A, [[72, 1]]),                  // XResolution
+            eRAT(0x011B, [[72, 1]]),                  // YResolution
+            eSHORT(0x0128, 2),                        // ResolutionUnit = inch
+            eASCII(0x0131, EXIF_SOFTWARE),
+            eASCII(0x0132, dtStr),                    // DateTime
+            eSHORT(0x0213, 1),                        // YCbCrPositioning = centered
+            eLONG(0x8769, exifPtr)                    // ExifIFDPointer
+          ];
+          if (hasGps) list.push(eLONG(0x8825, gpsPtr));   // GPSInfoIFDPointer
+          return list;
+        };
+
+        const ifd0Len   = buildIfd(ifd0Entries(0, 0), 8).length;
+        const exifStart = 8 + ifd0Len;
+        const exifIfd   = buildIfd(exifEntries, exifStart);
+        const gpsStart  = exifStart + exifIfd.length;
+        const gpsIfd    = hasGps ? buildIfd(gpsEntries, gpsStart) : [];
+        const ifd0      = buildIfd(ifd0Entries(exifStart, gpsStart), 8);
+
+        const tiff    = [0x4D, 0x4D, 0x00, 0x2A, 0, 0, 0, 8].concat(ifd0, exifIfd, gpsIfd);
+        const payload = [0x45, 0x78, 0x69, 0x66, 0, 0].concat(tiff);   // "Exif" + 00 00
+        const seg     = [0xFF, 0xE1];
+        put16(seg, payload.length + 2);
+        return new Uint8Array(seg.concat(payload));
+      }
+
+      // JPEGの先頭(SOI)の直後にExifを差し込んだBlobを返す
+      async function _jpegWithExif(blob, info) {
+        try {
+          const src = new Uint8Array(await blob.arrayBuffer());
+          if (src[0] !== 0xFF || src[1] !== 0xD8) return blob;   // JPEGでなければそのまま
+          const app1 = _exifApp1(info);
+          const out  = new Uint8Array(src.length + app1.length);
+          out.set(src.subarray(0, 2), 0);
+          out.set(app1, 2);
+          out.set(src.subarray(2), 2 + app1.length);
+          return new Blob([out], { type: 'image/jpeg' });
+        } catch (e) {
+          return blob;   // 失敗しても写真は失わない
+        }
       }
 
       // ===== 落下物：処理前 → 近景 → 処理後 の3枚撮影＆クラウドアップロード =====
