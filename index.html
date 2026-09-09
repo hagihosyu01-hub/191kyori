@@ -409,6 +409,14 @@
         border-radius: 6px;
         display: block;
       }
+      .fall-review-item .sha {
+        font-family: "Roboto Mono", monospace;
+        font-size: 11px;
+        color: #9fb3c8;
+        word-break: break-all;
+        margin-top: 3px;
+        line-height: 1.4;
+      }
       .fall-review-item button {
         margin-top: 4px;
         padding: 6px 12px;
@@ -3609,8 +3617,9 @@
           shareButtonHtml +
           '<a href="' + siteUrl + '" target="_top" class="btn-back">🔗 X.com/萩保守 🔗</a>' +
           '<div class="info-box">' +
-          '<span class="info-title">【いろいろ説明v3.73】</span>' +         
+          '<span class="info-title">【いろいろ説明v3.74】</span>' +         
           '・周囲の環境により5～10m以上の誤差が生じる場合があります。<br>' +
+          '・ver3.74：落下物の3枚に SHA-256（改ざん検出用のハッシュ）を付けて保存します。確認画面にも表示されます。<br>' +
           '・ver3.73：撮影中にライト（懐中電灯）のON/OFFができます（対応端末のみ）。写真に焼き込む文字から日時を外しました。<br>' +
           '・ver3.72：落下物は1枚目を撮った瞬間の距離標で3枚とも固定。LINE送信・ファイル名・地図リンクも同じ値にそろえました。<br>'  +
           '・ver3.71：落下物撮影の画角を自動切替（処理前・処理後＝広角／近景＝標準）。超広角カメラが無い端末では標準のままです。<br>' +
@@ -4661,6 +4670,19 @@
         }
       }
 
+      // 画像ファイル（保存されるJPEGそのもの）のSHA-256を求める
+      // ※ 焼き込みや圧縮のあとの最終データを対象にしないと改ざん検出に使えません
+      async function _sha256Hex(blob) {
+        try {
+          if (!(window.crypto && crypto.subtle)) return null;   // 非HTTPSなど
+          const buf  = await blob.arrayBuffer();
+          const hash = await crypto.subtle.digest('SHA-256', buf);
+          return Array.from(new Uint8Array(hash))
+            .map(function(b) { return b.toString(16).padStart(2, '0'); })
+            .join('');
+        } catch (e) { return null; }
+      }
+
       // ===== 落下物：処理前 → 近景 → 処理後 の3枚撮影＆クラウドアップロード =====
       const FALL_STEPS = ['処理前', '近景', '処理後'];
       let fallShots = [null, null, null];  // {blob, url, kp, date, time}
@@ -4736,6 +4758,15 @@
         capturedLat = null;
         capturedLng = null;
 
+        // この1枚のSHA-256を計算（表示と送信に使う）
+        (function(shot) {
+          _sha256Hex(shot.blob).then(function(hex) {
+            shot.sha256 = hex;
+            const el = document.getElementById('fall-sha-' + idx);
+            if (el) el.textContent = 'SHA-256: ' + (hex || '計算できません');
+          });
+        })(fallShots[idx]);
+
         if (fallRetakeIndex !== null) {   // 撮り直し完了 → 確認画面へ戻る
           fallRetakeIndex = null;
           _fallShowReview();
@@ -4774,10 +4805,14 @@
           cap.textContent = (i + 1) + '. ' + FALL_STEPS[i];
           const img = document.createElement('img');
           img.src = s.url;
+          const sha = document.createElement('div');
+          sha.className = 'sha';
+          sha.id = 'fall-sha-' + i;
+          sha.textContent = 'SHA-256: ' + (s.sha256 || '計算中...');
           const btn = document.createElement('button');
           btn.textContent = '撮り直し';
           btn.onclick = function() { fallRetake(i); };
-          wrap.appendChild(cap); wrap.appendChild(img); wrap.appendChild(btn);
+          wrap.appendChild(cap); wrap.appendChild(img); wrap.appendChild(sha); wrap.appendChild(btn);
           list.appendChild(wrap);
         });
         document.getElementById('btn-fall-upload').disabled = false;
@@ -4827,6 +4862,9 @@
             btn.textContent = '📡 送信中... ' + (i + 1) + '/' + fallShots.length;
             fallToast('📡 送信中... ' + (i + 1) + '/' + fallShots.length);
             const base64 = await _blobToBase64(fallShots[i].blob);
+            if (!fallShots[i].sha256) {   // 未計算なら送信前に確定させる
+              fallShots[i].sha256 = await _sha256Hex(fallShots[i].blob);
+            }
             await fetch(PATROL_GAS_URL, {
               method: 'POST',
               mode: 'no-cors',
@@ -4841,6 +4879,7 @@
                 kp: kp, date: date, time: time, user: user,
                 event: '落下物',
                 message: '📍 ' + kp + '\n🧱 落下物（' + FALL_STEPS[i] + ' ' + (i + 1) + '/' + fallShots.length + '）\n🕐 ' + date + ' ' + time + (user ? '\n👤 ' + user : '') + _locLinesFrom(fallShots[0].lat, fallShots[0].lng),
+                sha256: fallShots[i].sha256 || '',
                 image: base64,
                 mimeType: 'image/jpeg'
               })
