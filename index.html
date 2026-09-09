@@ -358,7 +358,7 @@
       /* 撮影済みサムネの列（ライブ中に見える） */
       #fall-thumbs {
         position: absolute;
-        top: 80px; left: 16px;
+        top: 96px; left: 16px;
         display: none;
         flex-direction: column;
         gap: 6px;
@@ -477,6 +477,20 @@
         justify-content: center;
         z-index: 13;
         line-height: 1;
+      }
+      #light-label {
+        position: absolute;
+        top: 70px; left: 10px;
+        width: 64px;
+        text-align: center;
+        color: #fff;
+        font-size: 11px;
+        font-weight: bold;
+        text-shadow: 0 1px 3px rgba(0,0,0,0.9);
+        z-index: 13;
+        display: none;
+        pointer-events: none;
+        line-height: 1.2;
       }
       #btn-torch.on {
         background: #ffd11a;
@@ -1013,7 +1027,8 @@
       </div>
 
       <div id="fall-toast"></div>
-      <button id="btn-torch" onclick="toggleTorch()" title="ライト" aria-label="ライトを点ける">🔦</button>
+      <button id="btn-torch" onclick="cycleLight()" title="ライト" aria-label="ライトを点ける">🔦</button>
+      <div id="light-label">ライト</div>
       <button id="camera-close" onclick="closeCamera()">✕</button>
     </div>
 
@@ -3617,8 +3632,9 @@
           shareButtonHtml +
           '<a href="' + siteUrl + '" target="_top" class="btn-back">🔗 X.com/萩保守 🔗</a>' +
           '<div class="info-box">' +
-          '<span class="info-title">【いろいろ説明v3.75】</span>' +         
+          '<span class="info-title">【いろいろ説明v3.76】</span>' +         
           '・周囲の環境により5～10m以上の誤差が生じる場合があります。<br>' +
+          '・ver3.76：ライトのボタンが 消灯→フラッシュ（撮影時だけ光る）→常時点灯 の切り替えになりました。<br>' +
           '・ver3.75：写真にExif（撮影日時・GPSの緯度経度・距離標）を入れるようにしました。<br>' +
           '・ver3.74：落下物の3枚に SHA-256（改ざん検出用のハッシュ）を付けて保存します。確認画面にも表示されます。<br>' +
           '・ver3.73：撮影中にライト（懐中電灯）のON/OFFができます（対応端末のみ）。写真に焼き込む文字から日時を外しました。<br>' +
@@ -3766,8 +3782,10 @@
         openCamera('fall');
       }
 
-      // ===== ライト（トーチ）のON/OFF =====
-      let torchOn = false;
+      // ===== ライト：消灯 / フラッシュ（撮影時だけ光る）/ 常時点灯 =====
+      let lightMode = 'off';        // 'off' | 'flash' | 'torch'
+      let torchOn = false;          // いまLEDが点いているか
+      const FLASH_WAIT_MS = 500;    // 点灯してから撮るまでの待ち（明るさが落ち着くまで）
 
       function _torchTrack() {
         return cameraStream ? cameraStream.getVideoTracks()[0] : null;
@@ -3789,22 +3807,55 @@
         } catch (e) { return false; }
       }
 
-      async function toggleTorch() {
-        const next = !torchOn;
-        const ok = await _applyTorch(next);
-        if (!ok) return;
-        torchOn = next;
+      // 押すたびに 消灯 → フラッシュ → 常時点灯 → 消灯
+      async function cycleLight() {
+        if (!_torchSupported()) return;
+        lightMode = (lightMode === 'off')   ? 'flash'
+                  : (lightMode === 'flash') ? 'torch' : 'off';
+        const ok = await _applyTorch(lightMode === 'torch');
+        torchOn = (lightMode === 'torch') && ok;
+        _updateTorchButton();
+      }
+
+      // 撮影の瞬間だけ光らせる（フラッシュ）。光らせたら true
+      async function _flashBefore() {
+        if (lightMode !== 'flash' || !_torchSupported()) return false;
+        const ok = await _applyTorch(true);
+        if (!ok) return false;
+        torchOn = true;
+        _updateTorchButton();
+        await new Promise(function(r) { setTimeout(r, FLASH_WAIT_MS); });
+        return true;
+      }
+
+      async function _flashAfter() {
+        await _applyTorch(false);
+        torchOn = false;
         _updateTorchButton();
       }
 
       // ライトボタンの表示・状態を更新（ライブ映像のときだけ出す）
+      const LIGHT_VIEW = {
+        off:   { icon: '🔦', text: 'ライト',   label: 'ライト：消灯。押すとフラッシュ' },
+        flash: { icon: '⚡', text: 'フラッシュ', label: 'フラッシュ：撮影時だけ光る。押すと常時点灯' },
+        torch: { icon: '🔦', text: '常時点灯', label: '常時点灯。押すと消灯' }
+      };
       function _updateTorchButton() {
         const btn = document.getElementById('btn-torch');
+        const lab = document.getElementById('light-label');
         if (!btn) return;
         const live = document.getElementById('btn-capture').style.display !== 'none';
-        btn.style.display = (live && _torchSupported()) ? 'flex' : 'none';
-        btn.classList.toggle('on', torchOn);
-        btn.setAttribute('aria-label', torchOn ? 'ライトを消す' : 'ライトを点ける');
+        const show = live && _torchSupported();
+        const v = LIGHT_VIEW[lightMode] || LIGHT_VIEW.off;
+        btn.style.display = show ? 'flex' : 'none';
+        btn.textContent = v.icon;
+        btn.classList.toggle('on', lightMode !== 'off');
+        btn.setAttribute('aria-label', v.label);
+        btn.setAttribute('title', v.label);
+        if (lab) {
+          lab.style.display = show ? 'block' : 'none';
+          lab.textContent = v.text;
+        }
       }
 
       // ===== 画角（レンズ）切り替え =====
@@ -3892,8 +3943,8 @@
         }
         if (cameraMode === 'fall') _fallUpdateBadge();
 
-        // ライト：点けたままレンズを切り替えたときは点け直す
-        if (torchOn) await _applyTorch(true);
+        // ライト：常時点灯のままレンズを切り替えたときは点け直す
+        if (lightMode === 'torch') { torchOn = await _applyTorch(true); }
         _updateTorchButton();
         setTimeout(_updateTorchButton, 600);   // 対応状況が遅れて分かる端末むけ
       }
@@ -3927,6 +3978,7 @@
         document.getElementById('fall-thumbs').style.display = (cameraMode === 'fall') ? 'flex' : 'none';
         if (cameraMode === 'fall') { _fallUpdateBadge(); _fallUpdateThumbs(); }
         capturedBlob = null;
+        lightMode = 'off';
         torchOn = false;
         _updateTorchButton();
         _startCamKpTimer();   // 下部テキストをリアルタイム更新開始
@@ -3937,9 +3989,12 @@
         _startCameraStream(cameraMode === 'fall' ? FALL_LENS[fallStep] : 'normal');
       }
 
-      function capturePhoto() {
+      async function capturePhoto() {
         const video  = document.getElementById('camera-video');
         const canvas = document.getElementById('camera-canvas');
+
+        // 映像がまだ来ていないうちに押された場合は撮らない（真っ黒な写真を防ぐ）
+        if (!video.videoWidth || video.readyState < 2) return;
 
         // 落下物の1枚目を撮った瞬間に距離標を固定（残り2枚も同じ距離標にする）
         const shotIdx = (fallRetakeIndex !== null) ? fallRetakeIndex : fallStep;
@@ -3967,7 +4022,10 @@
         const cropX = 0;
         const cropY = (vh - cropH) / 2;     // 縦中央からクロップ
 
+        // フラッシュ設定なら、光らせてから1枚
+        const flashed = await _flashBefore();
         ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, OUT_W, OUT_H);
+        if (flashed) _flashAfter();
 
         // 下端に黒帯＋白文字ゴシック1行
         const overlayText = _getOverlayText();
@@ -3995,6 +4053,7 @@
         // プレビュー表示に切り替え
         _stopCamKpTimer();   // 撮影値で確定するため更新停止
         document.getElementById('btn-torch').style.display = 'none';
+        document.getElementById('light-label').style.display = 'none';
         video.style.display = 'none';
         canvas.style.display = 'block';
         document.getElementById('crop-guide').style.display = 'none';
@@ -4621,6 +4680,7 @@
         });
         _fallClearShots();
         _stopCameraStream();
+        lightMode = 'off';
         torchOn = false;
         _updateTorchButton();
         cameraLens = null;
