@@ -1,0 +1,2869 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8">
+    
+    <link rel="manifest" href="manifest.json">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="R191距離標">
+    <link rel="apple-touch-icon" href="icon-192.png">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>R191萩保守距離標表示</title>
+
+<style>
+/* 画面全体のスクロールと文字自動拡大をロック */
+      html, body {
+        width: 100%;
+        overflow-x: hidden;
+        margin: 0;
+        padding: 0;
+        background-color: #f4f7f6;
+        -webkit-text-size-adjust: 100%;
+        text-size-adjust: 100%;
+      }
+
+      /* ★iPhoneのフォント崩れを防ぐため、日本語の標準ゴシック体を明示 */
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans JP", sans-serif;
+        text-align: center;
+        padding-top: 5.6vw;    /* 45px 相当 */
+        padding-bottom: 5.6vw;
+      }
+
+      /* 計算結果を囲む青い箱 */
+      #result {
+        margin: 2.5vw auto; 
+        padding: 3.75vw;       /* 30px 相当 */
+        background-color: #ffffff;
+        border: 0.375vw solid #007bff; /* 3px 相当 */
+        border-radius: 1.875vw;        /* 15px 相当 */
+        box-shadow: 0 0.5vw 1.25vw rgba(0,0,0,0.1);
+        width: 87.5vw;         /* 700px 相当（画面の87.5%の幅） */
+        box-sizing: border-box;
+      }
+
+      /* 上部のタイトル等の文字 */
+      .status-text {
+        font-size: 6.25vw;     /* 50px 相当 */
+        color: #333;
+        display: block;
+        font-weight: bold;
+      }
+
+      /* ★最重要：キロポストの巨大な数字 */
+      .kilo-post {
+        display: block;
+        font-size: 18vw;       /* 170px から、スマホ画面幅に100%連動するサイズに修正 */
+        font-weight: 900;
+        color: #d9534f;
+        margin: 2.5vw 0;
+        white-space: nowrap;
+        line-height: 1.1;
+        transform-origin: left center;
+      }
+
+      /* マスタから〇〇m の部分 */
+      .distance-display {
+        font-size: 4.375vw;    /* 35px 相当 */
+        color: #333;
+        margin-bottom: 2.5vw;
+        font-weight: bold;
+      }
+
+      /* 図面の外枠 */
+      .drawing-container {
+        margin: 3.75vw 0;
+        padding: 2.5vw;
+        border: 0.25vw dashed #007bff;
+        border-radius: 1.25vw;
+        background-color: #f0f7ff;
+      }
+
+      /* 図面PDFを開くボタン */
+      .btn-drawing {
+        display: inline-block;
+        padding: 1.875vw 3.75vw;
+        background-color: #007bff;
+        color: white;
+        text-decoration: none;
+        font-size: 5vw;        /* 40px 相当 */
+        font-weight: bold;
+        border-radius: 1vw;
+        box-shadow: 0 0.5vw 0.75vw rgba(0,0,0,0.1);
+      }
+
+      .drawing-label {
+        font-weight: bold;
+        color: #0056b3;
+        margin-bottom: 1.875vw;
+        display: block;
+        font-size: 3vw;
+      }
+
+      /* 距離標を共有ボタン（オレンジ） */
+      .btn-share {
+        display: block;
+        margin-top: 2.5vw;
+        padding: 2.5vw;
+        background-color: #ff9800;
+        color: white;
+        text-decoration: none;
+        font-size: 5.625vw;    /* 45px 相当 */
+        font-weight: bold;
+        border-radius: 1.25vw;
+        box-shadow: 0 0.5vw 0.75vw rgba(0,0,0,0.2);
+        border: none;
+        width: 100%;
+        cursor: pointer;
+      }
+
+      /* X.comへのボタン（緑） */
+      .btn-back {
+        display: block;
+        margin-top: 3.75vw;
+        padding: 2.5vw;
+        background-color: #28a745;
+        color: white;
+        text-decoration: none;
+        font-size: 5.625vw;    /* 45px 相当 */
+        font-weight: bold;
+        border-radius: 1.25vw;
+        box-shadow: 0 0.5vw 0.75vw rgba(0,0,0,0.2);
+      }
+
+      /* 下部の注意書きボックス */
+      .info-box {
+        margin-top: 3.75vw;
+        padding: 1.875vw;
+        text-align: left;
+        background: #e9ecef;
+        border-radius: 1vw;
+        font-size: 2.8vw;      /* 20px 相当 */
+        color: #666;
+        line-height: 1.5;
+      }
+
+      .info-title {
+        color: #333;
+        font-size: 3vw;
+        font-weight: bold;
+        display: block;
+        margin-bottom: 0.625vw;
+      }
+
+      /* ★レスポンシブ自動縮小トリガー（画面幅800px以下の端末） */
+      @media screen and (max-width: 800px) {
+        body {
+          transform: scale(calc(100vw / 800));
+          width: 100vw;
+          height: calc(100% / (100vw / 800));
+        }
+      }
+
+      /* カメラ撮影ボタン（紫） */
+      .btn-camera {
+        display: block;
+        margin-top: 2.5vw;
+        padding: 2.5vw;
+        background-color: #6f42c1;
+        color: white;
+        font-size: 5.625vw;
+        font-weight: bold;
+        border-radius: 1.25vw;
+        box-shadow: 0 0.5vw 0.75vw rgba(0,0,0,0.2);
+        border: none;
+        width: 100%;
+        cursor: pointer;
+      }
+
+      /* 落下物撮影ボタン（オレンジ） */
+      .btn-camera-fall {
+        display: block;
+        margin-top: 2.5vw;
+        padding: 2.5vw;
+        background-color: #e8590c;
+        color: white;
+        font-size: 5.625vw;
+        font-weight: bold;
+        border-radius: 1.25vw;
+        box-shadow: 0 0.5vw 0.75vw rgba(0,0,0,0.2);
+        border: none;
+        width: 100%;
+        cursor: pointer;
+      }
+
+      /* 写管屋4パターン比較テストボタン */
+      .btn-shakan-test {
+        display: block;
+        margin-top: 2.5vw;
+        padding: 2.5vw;
+        background-color: #455a64;
+        color: white;
+        font-size: 5.2vw;
+        font-weight: bold;
+        border-radius: 1.25vw;
+        box-shadow: 0 0.5vw 0.75vw rgba(0,0,0,0.2);
+        border: none;
+        width: 100%;
+        cursor: pointer;
+      }
+
+      /* カメラモーダル */
+      #camera-modal {
+        display: none;
+        position: fixed;
+        top: 0; left: 0;
+        width: 100vw; height: 100vh;
+        background: #000;
+        z-index: 9999;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+      }
+      #camera-video {
+        position: absolute;
+        top: 0; left: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+      #camera-canvas {
+        position: absolute;
+        top: 0; left: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        background: #000;
+        display: none;
+      }
+      /* 撮影範囲を示す横長の枠 */
+      #crop-guide {
+        position: absolute;
+        left: 0; right: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        /* 縦画面幅100%に対して4:3の高さ = 100vw * (960/1280) = 75vw */
+        height: 75vw;
+        border-top: 2px solid rgba(255,255,255,0.8);
+        border-bottom: 2px solid rgba(255,255,255,0.8);
+        box-shadow:
+          0 -9999px 0 9999px rgba(0,0,0,0.45),
+          0  9999px 0 9999px rgba(0,0,0,0.45);
+        z-index: 10;
+        pointer-events: none;
+      }
+      /* 枠の四隅 */
+      #crop-guide::before,
+      #crop-guide::after {
+        content: '';
+        position: absolute;
+        width: 24px; height: 24px;
+        border-color: #fff;
+        border-style: solid;
+      }
+      #crop-guide::before {
+        top: -2px; left: 0;
+        border-width: 2px 0 0 2px;
+      }
+      #crop-guide::after {
+        top: -2px; right: 0;
+        border-width: 2px 2px 0 0;
+      }
+      /* 枠内下端のテキスト（ファインダー用） */
+      #camera-kp-overlay {
+        position: absolute;
+        left: 0; right: 0;
+        top: 50%;
+        /* 枠の下端 = top50% + 75vw/2 - テキスト高さ */
+        transform: translateY(calc(37.5vw - 32px));
+        background: rgba(0,0,0,0.72);
+        padding: 4px 10px;
+        z-index: 11;
+        pointer-events: none;
+      }
+      #camera-kp-overlay span {
+        color: #fff;
+        font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif;
+        font-size: 18px;   /* 1.5倍に拡大（12px→18px） */
+        font-weight: bold;
+        white-space: nowrap;
+        letter-spacing: 0.5px;
+      }
+      #camera-controls {
+        position: absolute;
+        bottom: 105px;   /* シャッターをボタン約2/3分(≈45px)上へ */
+        left: 0; right: 0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 24px;
+        z-index: 12;
+      }
+      .btn-cam-capture {
+        width: 68px; height: 68px;
+        border-radius: 50%;
+        background: #fff;
+        border: 5px solid #aaa;
+        cursor: pointer;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+        flex-shrink: 0;
+      }
+      .btn-cam-action {
+        padding: 12px 20px;
+        border-radius: 10px;
+        border: none;
+        font-size: 15px;
+        font-weight: bold;
+        cursor: pointer;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+      }
+      .btn-cam-retake { background: #555; color: #fff; }
+      .btn-cam-save   { background: #007bff; color: #fff; }
+      .btn-cam-lock   { background: rgba(255,255,255,0.92); color: #222; }
+      .btn-cam-lock.locked { background: #e53935; color: #fff; }
+      /* 横向き撮影時はシャッター等を右側中央に縦並びで配置（縦向きは下部中央のまま） */
+      @media (orientation: landscape) {
+        #camera-controls {
+          top: 50%;
+          bottom: auto;
+          left: auto;
+          right: 30px;
+          transform: translateY(-50%);
+          flex-direction: column;
+        }
+        /* 縦向き用の枠下端基準(37.5vw)だと横向きでは画面外に出るため、
+           横向きでは画面下部中央に固定して常に見えるようにする */
+        #camera-kp-overlay {
+          top: auto;
+          bottom: 16px;
+          transform: none;
+          left: 0; right: 120px;   /* 右側のシャッター領域を避ける */
+          text-align: center;
+        }
+      }
+      .btn-cam-next   { background: #e8590c; color: #fff; }
+
+      /* ===== 落下物3枚撮影 ===== */
+      /* 上部の手順バッジ（処理前 → 近景 → 処理後） */
+      #fall-step-badge {
+        position: absolute;
+        top: 16px; left: 50%;
+        transform: translateX(-50%);
+        text-align: center;
+        white-space: nowrap;
+        display: none;
+        background: rgba(232,89,12,0.92);
+        color: #fff;
+        font-size: 15px;
+        font-weight: bold;
+        padding: 8px 14px;
+        border-radius: 20px;
+        z-index: 13;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+        line-height: 1.2;
+      }
+      #fall-step-badge small {
+        display: block;
+        font-size: 11px;
+        font-weight: normal;
+        opacity: 0.9;
+      }
+      /* 撮影済みサムネの列（ライブ中に見える） */
+      #fall-thumbs {
+        position: absolute;
+        top: 96px; left: 16px;
+        display: none;
+        flex-direction: column;
+        gap: 6px;
+        z-index: 13;
+      }
+      #fall-thumbs img {
+        width: 64px;
+        border: 2px solid #fff;
+        border-radius: 4px;
+        display: block;
+      }
+      /* 確認画面 */
+      #fall-review {
+        position: absolute;
+        top: 0; left: 0; right: 0; bottom: 0;
+        display: none;
+        flex-direction: column;
+        background: #111;
+        z-index: 14;
+        overflow-y: auto;
+        padding: 14px;
+        box-sizing: border-box;
+      }
+      #fall-review h3 {
+        color: #fff;
+        font-size: 17px;
+        margin: 8px 56px 10px 0;
+        text-align: center;
+      }
+      #fall-review .fall-kp {
+        color: #ffd11a;
+        font-size: 14px;
+        text-align: center;
+        margin-bottom: 10px;
+        word-break: break-all;
+      }
+      .fall-review-item {
+        margin-bottom: 10px;
+      }
+      .fall-review-item .cap {
+        color: #fff;
+        font-size: 13px;
+        font-weight: bold;
+        margin-bottom: 3px;
+      }
+      .fall-review-item img {
+        width: 100%;
+        border-radius: 6px;
+        display: block;
+      }
+      .fall-review-item .sha {
+        font-family: "Roboto Mono", monospace;
+        font-size: 11px;
+        color: #9fb3c8;
+        word-break: break-all;
+        margin-top: 3px;
+        line-height: 1.4;
+      }
+      .fall-review-item button {
+        margin-top: 4px;
+        padding: 6px 12px;
+        font-size: 13px;
+        border: none;
+        border-radius: 6px;
+        background: #555;
+        color: #fff;
+        cursor: pointer;
+      }
+      #fall-review-actions {
+        display: flex;
+        gap: 10px;
+        margin: 8px 0 24px;
+      }
+      #fall-review-actions button {
+        flex: 1;
+        padding: 14px 8px;
+        font-size: 16px;
+        font-weight: bold;
+        border: none;
+        border-radius: 10px;
+        cursor: pointer;
+      }
+      #btn-fall-upload { background: #0d8f3f; color: #fff; }
+      #btn-fall-upload:disabled { background: #666; color: #ccc; }
+      #btn-fall-cancel { background: #555; color: #fff; }
+      /* カメラ内トースト */
+      #fall-toast {
+        position: absolute;
+        left: 50%; bottom: 40px;
+        transform: translateX(-50%);
+        display: none;
+        background: rgba(0,0,0,0.85);
+        color: #fff;
+        font-size: 15px;
+        font-weight: bold;
+        padding: 12px 20px;
+        border-radius: 24px;
+        z-index: 20;
+        white-space: nowrap;
+      }
+      #fall-toast.ok  { background: rgba(13,143,63,0.95); }
+      #fall-toast.err { background: rgba(211,47,47,0.95); }
+
+      #btn-torch {
+        position: absolute;
+        top: 16px; left: 16px;
+        width: 52px; height: 52px;
+        border-radius: 50%;
+        background: rgba(0,0,0,0.55);
+        border: 2px solid #fff;
+        color: #fff;
+        font-size: 24px;
+        cursor: pointer;
+        display: none;          /* 対応端末でのみ表示 */
+        align-items: center;
+        justify-content: center;
+        z-index: 13;
+        line-height: 1;
+      }
+      #light-label {
+        position: absolute;
+        top: 70px; left: 10px;
+        width: 64px;
+        text-align: center;
+        color: #fff;
+        font-size: 11px;
+        font-weight: bold;
+        text-shadow: 0 1px 3px rgba(0,0,0,0.9);
+        z-index: 13;
+        display: none;
+        pointer-events: none;
+        line-height: 1.2;
+      }
+      #btn-torch.on {
+        background: #ffd11a;
+        border-color: #fff;
+        box-shadow: 0 0 14px rgba(255,209,26,0.9);
+      }
+
+      #camera-close {
+        position: absolute;
+        top: 16px; right: 16px;
+        width: 44px; height: 44px;
+        border-radius: 50%;
+        background: rgba(0,0,0,0.55);
+        border: 2px solid #fff;
+        color: #fff;
+        font-size: 22px;
+        font-weight: bold;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 15;
+        line-height: 1;
+      }
+
+      /* ===== 図面表示モーダル ===== */
+      #map-modal {
+        display: none;
+        position: fixed;
+        top: 0; left: 0;
+        width: 100vw; height: 100vh;
+        background: #111;
+        z-index: 8000;
+        flex-direction: column;
+      }
+      #map-modal-header {
+        position: absolute;
+        top: 0; left: 0; right: 0;
+        height: 48px;
+        background: rgba(0,0,0,0.75);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 12px;
+        z-index: 10;
+      }
+      #map-modal-title {
+        color: #fff;
+        font-size: 13px;
+        font-weight: bold;
+      }
+      #map-modal-close {
+        width: 40px; height: 40px;
+        border-radius: 50%;
+        background: rgba(255,255,255,0.2);
+        border: 2px solid #fff;
+        color: #fff;
+        font-size: 20px;
+        font-weight: bold;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        line-height: 1;
+      }
+      #map-canvas-wrap {
+        position: absolute;
+        top: 48px; left: 0; right: 0; bottom: 0;
+        overflow: hidden;
+        background: #222;
+        touch-action: none;
+      }
+      #map-canvas {
+        position: absolute;
+        top: 0; left: 0;
+        transform-origin: 0 0;
+        cursor: grab;
+      }
+      #map-canvas:active { cursor: grabbing; }
+      #map-status {
+        position: absolute;
+        bottom: 16px; left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0,0,0,0.7);
+        color: #fff;
+        font-size: 12px;
+        padding: 4px 12px;
+        border-radius: 12px;
+        pointer-events: none;
+        white-space: nowrap;
+        z-index: 10;
+      }
+      /* 図面表示ボタン（青紫） */
+      .btn-map {
+        display: block;
+        margin-top: 2.5vw;
+        padding: 2.5vw;
+        background-color: #5c6bc0;
+        color: white;
+        font-size: 5.625vw;
+        font-weight: bold;
+        border-radius: 1.25vw;
+        box-shadow: 0 0.5vw 0.75vw rgba(0,0,0,0.2);
+        border: none;
+        width: 100%;
+        cursor: pointer;
+      }
+
+      /* 距離標から図面ボタン（緑） */
+      .btn-kpsearch {
+        display: block;
+        margin-top: 2.5vw;
+        padding: 2.5vw;
+        background-color: #00897b;
+        color: white;
+        font-size: 5.625vw;
+        font-weight: bold;
+        border-radius: 1.25vw;
+        box-shadow: 0 0.5vw 0.75vw rgba(0,0,0,0.2);
+        border: none;
+        width: 100%;
+        cursor: pointer;
+      }
+
+      /* ===== 距離標入力モーダル ===== */
+      #kp-modal {
+        display: none;
+        position: fixed;
+        top: 0; left: 0;
+        width: 100vw; height: 100vh;
+        background: rgba(0,0,0,0.75);
+        z-index: 9000;
+        align-items: center;
+        justify-content: center;
+      }
+      #kp-modal-box {
+        background: #fff;
+        width: 86vw;
+        max-width: 420px;
+        border-radius: 3vw;
+        padding: 4vw;
+        box-shadow: 0 1vw 3vw rgba(0,0,0,0.4);
+      }
+      #kp-modal-title {
+        font-size: 4.6vw;
+        font-weight: bold;
+        color: #222;
+        text-align: center;
+        margin-bottom: 3vw;
+      }
+      #kp-input-row {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 1.5vw;
+      }
+      #kp-input-row select,
+      #kp-input-row input {
+        font-size: min(6vw, 26px);
+        font-weight: bold;
+        text-align: center;
+        border: 0.5vw solid #bbb;
+        border-radius: 1.5vw;
+        padding: 2vw 1vw;
+        color: #222;
+        background: #fff;
+      }
+      #kp-in-km { width: 34vw; max-width: 150px; }
+      #kp-in-m  { width: 26vw; max-width: 120px; }
+      .kp-unit { font-size: 5.5vw; font-weight: bold; color: #444; }
+      #kp-modal-hint {
+        font-size: 3.4vw;
+        color: #666;
+        text-align: center;
+        margin-top: 2vw;
+      }
+      #kp-modal-msg {
+        min-height: 4.5vw;
+        color: #d32f2f;
+        font-size: 3.6vw;
+        font-weight: bold;
+        text-align: center;
+        margin-top: 1.5vw;
+      }
+      #kp-modal-actions {
+        display: flex;
+        gap: 2.5vw;
+        margin-top: 3vw;
+      }
+      #kp-modal-actions button {
+        flex: 1;
+        padding: 3vw 0;
+        font-size: 4.5vw;
+        font-weight: bold;
+        border: none;
+        border-radius: 1.5vw;
+        cursor: pointer;
+        color: #fff;
+      }
+      #kp-cancel { background: #9e9e9e; }
+      #kp-go     { background: #00897b; }
+
+      /* ===== 巡回点検モーダル ===== */
+      #patrol-modal {
+        display: none;
+        position: fixed;
+        top: 0; left: 0;
+        width: 100vw; height: 100vh;
+        background: #1a1a2e;
+        z-index: 7000;
+        flex-direction: column;
+        align-items: stretch;
+      }
+      #patrol-header {
+        background: #16213e;
+        padding: 3vw 4vw 2vw;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 1px solid #0f3460;
+        flex-shrink: 0;
+      }
+      #patrol-kp {
+        font-size: 10.5vw;
+        font-weight: 900;
+        color: #ffeb3b;
+        letter-spacing: 0.05em;
+      }
+      #patrol-right {
+        text-align: right;
+      }
+      #patrol-user-display {
+        font-size: 4.5vw;
+        font-weight: bold;
+        color: #fff;
+      }
+      #patrol-time {
+        font-size: 3.5vw;
+        color: #aaa;
+      }
+      #patrol-close {
+        position: absolute;
+        top: 2vw; right: 3vw;
+        width: 9vw; height: 9vw;
+        border-radius: 50%;
+        background: rgba(255,255,255,0.15);
+        border: 2px solid #fff;
+        color: #fff;
+        font-size: 5vw;
+        font-weight: bold;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      /* 名前選択レイヤー */
+      #patrol-name-layer {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        flex: 1;
+        padding: 6vw;
+        gap: 3vw;
+      }
+      #patrol-name-layer h2 {
+        color: #fff;
+        font-size: 5.5vw;
+        margin-bottom: 2vw;
+      }
+      .patrol-name-btn {
+        width: 100%;
+        padding: 4.5vw;
+        font-size: 5.5vw;
+        font-weight: bold;
+        border-radius: 3vw;
+        border: 2px solid #0f3460;
+        background: #16213e;
+        color: #fff;
+        cursor: pointer;
+      }
+      .patrol-name-btn:active { background: #0f3460; }
+
+      /* 事象ボタンレイヤー */
+      #patrol-event-layer {
+        display: none;
+        flex-direction: column;
+        flex: 1;
+        padding: 2vw;
+        gap: 2vw;
+        background: #fff;
+      }
+      #patrol-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 2vw;
+        flex: 1;
+      }
+      .patrol-evt-btn {
+        border: none;
+        border-radius: 3vw;
+        cursor: pointer;
+        background: #fff;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1.5vw;
+        padding: 3vw 2vw;
+        transition: transform 0.1s, opacity 0.1s;
+      }
+      .patrol-evt-btn:active {
+        transform: scale(0.95);
+        opacity: 0.8;
+      }
+      .patrol-evt-btn img {
+        width: 72%;
+        aspect-ratio: 1 / 1;
+        object-fit: contain;
+      }
+      .patrol-evt-label {
+        color: #222;
+        font-size: 4.2vw;
+        font-weight: bold;
+        text-align: center;
+        line-height: 1.3;
+      }
+      #patrol-change-user {
+        background: none;
+        border: 1px solid #444;
+        color: #aaa;
+        font-size: 3.5vw;
+        padding: 1.5vw 3vw;
+        border-radius: 2vw;
+        cursor: pointer;
+        align-self: center;
+        flex-shrink: 0;
+      }
+      /* その他異常（写真撮影→送信）ボタン */
+      #patrol-other-btn {
+        background: #e67e22;
+        border: none;
+        color: #fff;
+        font-size: 4.6vw;
+        font-weight: bold;
+        padding: 3.2vw 3vw;
+        border-radius: 3vw;
+        cursor: pointer;
+        flex-shrink: 0;
+        box-shadow: 0 0.5vw 1.5vw rgba(0,0,0,0.25);
+      }
+      #patrol-other-btn:active { background: #cf6f1c; transform: scale(0.98); }
+      /* 黄色い車アイコン（絵文字🚗の代わり） */
+      .car-ico { width: 1.15em; height: 1.15em; vertical-align: -0.22em; }
+      /* 赤いピンマークアイコン */
+      .pin-ico { width: 1.1em; height: 1.15em; vertical-align: -0.22em; }
+
+      /* トースト */
+      #patrol-toast {
+        display: none;
+        position: fixed;
+        bottom: 12vw;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0,0,0,0.85);
+        color: #fff;
+        padding: 3vw 7vw;
+        border-radius: 8vw;
+        font-size: 4.5vw;
+        font-weight: bold;
+        z-index: 9999;
+        white-space: nowrap;
+        pointer-events: none;
+        border: 2px solid transparent;
+      }
+      #patrol-toast.ok  { border-color: #2ecc71; }
+      #patrol-toast.err { border-color: #e74c3c; }
+
+      /* 巡回点検ボタン（メイン画面） */
+      .btn-patrol {
+        display: block;
+        margin-top: 2.5vw;
+        padding: 2.5vw;
+        background-color: #e94560;
+        color: white;
+        font-size: 5.625vw;
+        font-weight: bold;
+        border-radius: 1.25vw;
+        box-shadow: 0 0.5vw 0.75vw rgba(0,0,0,0.2);
+        border: none;
+        width: 100%;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+
+  <body>
+
+    <div id="result">
+      <span id="status" class="status-text">位置情報を取得中...</span>
+      <div id="output"></div>
+    </div>
+
+
+
+    <!-- 巡回点検モーダル -->
+    <div id="patrol-modal">
+      <div id="patrol-header" style="position:relative;">
+        <div>
+          <div id="patrol-kp">---</div>
+          <div id="patrol-time" style="color:#aaa;font-size:3.5vw;">--:--</div>
+        </div>
+        <div id="patrol-right">
+          <div id="patrol-user-display" style="color:#fff;font-size:4.5vw;font-weight:bold;text-align:right;">---</div>
+        </div>
+        <button id="patrol-close" onclick="closePatrol()">✕</button>
+      </div>
+
+      <!-- 名前選択レイヤー -->
+      <div id="patrol-name-layer">
+        <h2><svg class="car-ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="#ffd11a" d="M5 11l1.3-3.9C6.6 6.2 7.4 5.6 8.3 5.6h7.4c.9 0 1.7.6 2 1.5L19 11l1.4.5c.4.1.6.5.6.9V17c0 .6-.4 1-1 1h-1c-.6 0-1-.4-1-1v-1H6v1c0 .6-.4 1-1 1H4c-.6 0-1-.4-1-1v-4.6c0-.4.2-.8.6-.9L5 11z"/><path fill="#fff3b0" d="M7.6 7.6l-.8 3h10.4l-.8-3c-.1-.4-.5-.7-.95-.7H8.55c-.45 0-.85.3-.95.7z"/><circle cx="7.5" cy="15.5" r="1.5" fill="#333"/><circle cx="16.5" cy="15.5" r="1.5" fill="#333"/></svg> 名前を選んでください</h2>
+        <button class="patrol-name-btn" onclick="patrolSelectUser('なかむら')">なかむら</button>
+        <button class="patrol-name-btn" onclick="patrolSelectUser('かみむら')">かみむら</button>
+        <button class="patrol-name-btn" onclick="patrolSelectUser('Aさん')">Aさん</button>
+        <button class="patrol-name-btn" onclick="patrolSelectUser('Bさん')">Bさん</button>
+        <button class="patrol-name-btn" onclick="patrolSelectUser('Cさん')">Cさん</button>
+      </div>
+
+      <!-- 事象ボタンレイヤー -->
+      <div id="patrol-event-layer">
+        <div id="patrol-grid">
+          <button class="patrol-evt-btn" onclick="patrolSend('ポットホール')">
+            <img src="patrol_pothole.png" alt="ポットホール">
+            <span class="patrol-evt-label">ポットホール</span>
+          </button>
+          <button class="patrol-evt-btn" onclick="patrolSend('路肩堆積物')">
+            <img src="patrol_debris.png" alt="路肩堆積物">
+            <span class="patrol-evt-label">路肩堆積物</span>
+          </button>
+          <button class="patrol-evt-btn" onclick="patrolSend('通行支障木')">
+            <img src="patrol_tree-road.png" alt="通行支障木">
+            <span class="patrol-evt-label">通行支障木</span>
+          </button>
+          <button class="patrol-evt-btn" onclick="patrolSend('視認支障木')">
+            <img src="patrol_tree-sight.png" alt="視認支障木">
+            <span class="patrol-evt-label">視認支障木</span>
+          </button>
+          <button class="patrol-evt-btn" onclick="patrolSend('防護柵等異常')">
+            <img src="patrol_guardrail.png" alt="防護柵等異常">
+            <span class="patrol-evt-label">防護柵等異常</span>
+          </button>
+          <button class="patrol-evt-btn" onclick="patrolSend('照明異常')">
+            <img src="patrol_light.png" alt="照明異常">
+            <span class="patrol-evt-label">照明異常</span>
+          </button>
+        </div>
+        <button id="patrol-other-btn" onclick="openPatrolCamera()">📷 その他異常（写真を撮って送信）</button>
+        <button id="patrol-change-user" onclick="patrolChangeUser()">▶ 名前を変更</button>
+      </div>
+    </div>
+
+    <!-- 巡回点検トースト -->
+    <div id="patrol-toast"></div>
+
+    <!-- 図面表示モーダル -->
+    <div id="map-modal">
+      <div id="map-modal-header">
+        <span id="map-modal-title">図面表示</span>
+        <button id="map-modal-close" onclick="closeMapModal()">✕</button>
+      </div>
+      <div id="map-canvas-wrap">
+        <canvas id="map-canvas"></canvas>
+      </div>
+      <div id="map-status">読み込み中...</div>
+    </div>
+
+    <!-- 距離標入力モーダル（打ち込んだ距離標の図面を表示） -->
+    <div id="kp-modal">
+      <div id="kp-modal-box">
+        <div id="kp-modal-title">距離標を入力して図面を表示</div>
+        <div id="kp-input-row">
+          <select id="kp-in-km"></select>
+          <span class="kp-unit">k</span>
+          <input id="kp-in-m" type="number" inputmode="numeric" min="0" max="999" placeholder="000">
+        </div>
+        <div id="kp-modal-hint">例：120 k 300 → 120k300 の図面を表示</div>
+        <div id="kp-modal-msg"></div>
+        <div id="kp-modal-actions">
+          <button id="kp-cancel" onclick="closeKpSearch()">キャンセル</button>
+          <button id="kp-go" onclick="kpSearchGo()">図面を表示</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- カメラモーダル -->
+    <div id="camera-modal">
+      <video id="camera-video" autoplay playsinline muted></video>
+      <canvas id="camera-canvas"></canvas>
+
+      <!-- 撮影範囲ガイド枠 -->
+      <div id="crop-guide"></div>
+
+      <!-- 枠内下端のテキスト -->
+      <div id="camera-kp-overlay">
+        <span id="camera-kp-text">---</span>
+      </div>
+
+      <!-- 落下物モード：手順バッジと撮影済みサムネ -->
+      <div id="fall-step-badge">
+        <span id="fall-step-title">処理前</span>
+        <small id="fall-step-count">1 / 3 枚目</small>
+      </div>
+      <div id="fall-thumbs"></div>
+
+      <div id="camera-controls">
+        <button id="btn-lock" class="btn-cam-action btn-cam-lock" onclick="toggleKpLock()">距離標固定</button>
+        <button id="btn-retake" class="btn-cam-action btn-cam-retake" style="display:none;" onclick="retakePhoto()">撮り直し</button>
+        <button id="btn-capture" class="btn-cam-capture" onclick="capturePhoto()" title="撮影"></button>
+        <button id="btn-save" class="btn-cam-action btn-cam-save" style="display:none;" onclick="savePhoto()">保存/共有</button>
+        <button id="btn-patrol-send" class="btn-cam-action btn-cam-save" style="display:none;" onclick="patrolSendPhoto()">送信</button>
+        <button id="btn-fall-next" class="btn-cam-action btn-cam-next" style="display:none;" onclick="fallNextStep()">次へ</button>
+      </div>
+
+      <!-- 落下物モード：3枚そろった後の確認・アップロード画面 -->
+      <div id="fall-review">
+        <h3>落下物 3枚の確認</h3>
+        <div class="fall-kp" id="fall-review-kp">---</div>
+        <div id="fall-review-list"></div>
+        <div id="fall-review-actions">
+          <button id="btn-fall-cancel" onclick="fallCancel()">やり直し</button>
+          <button id="btn-fall-upload" onclick="fallUpload()">☁️ アップロード</button>
+        </div>
+      </div>
+
+      <!-- 写管屋4パターン比較テスト：生成・アップロード状況 -->
+      <div id="shakan-test-panel" style="display:none;position:absolute;left:4%;right:4%;bottom:22px;z-index:30;background:rgba(0,0,0,.88);color:#fff;padding:14px;border-radius:12px;text-align:left;font-size:13px;line-height:1.5;">
+        <div style="font-weight:bold;font-size:15px;margin-bottom:6px;">写管屋4パターン比較テスト</div>
+        <div id="shakan-test-status">撮影するとA～Dを同時生成します。</div>
+      </div>
+
+      <div id="fall-toast"></div>
+      <button id="btn-torch" onclick="cycleLight()" title="ライト" aria-label="ライトを点ける">🔦</button>
+      <div id="light-label">ライト</div>
+      <button id="camera-close" onclick="closeCamera()">✕</button>
+    </div>
+
+    <script>
+      // ★ここにスプレッドシートの数式で出力したマスタデータをそのまま貼り付けてください
+      const MASTER_DATA = [
+  { label: "萩保守作業所", lat: 34.3959841667, lng: 131.4001935028, url: ""},
+  { label: "萩備蓄倉庫", lat: 34.3962869972, lng: 131.4002691667, url: ""},
+  { label: "協和建設工業", lat: 34.3949325028, lng: 131.4014613333, url: ""},
+      ];
+
+      let latestKiloPost = "---";
+
+      window.onload = function() {
+        getLocation();
+        // サービスワーカーの登録（PWA用）
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.register('service-worker.js')
+            .then(() => console.log('Service Worker Registered'));
+        }
+      };
+
+      function getLocation() {
+        const options = {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0
+        };
+        navigator.geolocation.watchPosition(success, error, options);
+      }
+
+      function success(position) {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        currentGpsLat = lat;
+        currentGpsLng = lng;
+        const res = calculateNearest(lat, lng);
+        showResult(res);
+      }
+
+      function error() {
+        document.getElementById("status").innerHTML =
+          '<span style="color:red; font-weight:bold;">GPSエラー</span><br>位置情報を許可してください。';
+      }
+
+      function calculateNearest(lat, lng) {
+        if (!MASTER_DATA || MASTER_DATA.length === 0) {
+          return { status: "データなし", distance: "---" };
+        }
+
+        let points = MASTER_DATA.map(p => ({
+          ...p,
+          dist: calculateDistance(lat, lng, p.lat, p.lng)
+        }));
+
+        points.sort((a, b) => a.dist - b.dist);
+        const nearest = points[0];
+        const second = points[1] || nearest;
+
+        let resultKP = (nearest.dist > 50) ? "圏外です" : getInterpolatedKP(nearest, second, lat, lng);
+
+        return {
+          status: resultKP,
+          distance: nearest.dist.toFixed(1) + "m",
+          drawing: nearest.url,
+          baseMaster: nearest.label
+        };
+      }
+
+      function getInterpolatedKP(p1, p2, curLat, curLng) {
+        const parseKP = (label) => {
+          const match = label.match(/(\d+)(?:-(\d+))?k(\d+)/);
+          if (!match) return null;
+          const km = parseInt(match[1], 10);
+          const branch = match[2] ? parseInt(match[2], 10) : 0;
+          const m = parseInt(match[3], 10);
+          return {
+            totalM: (km * 1000) + (branch * 1000) + m,
+            hasHyphen: !!match[2],
+            km: km,
+            branch: branch
+          };
+        };
+
+        const d1 = parseKP(p1.label);
+        const d2 = parseKP(p2.label);
+        if (!d1 || !d2) return p1.label;
+
+        let A = (d1.totalM < d2.totalM) ? { ...p1, m: d1.totalM, data: d1 } : { ...p2, m: d2.totalM, data: d2 };
+        let B = (d1.totalM < d2.totalM) ? { ...p2, m: d2.totalM } : { ...p1, m: d1.totalM };
+
+        const x = curLng - A.lng;
+        const y = curLat - A.lat;
+        const dx = B.lng - A.lng;
+        const dy = B.lat - A.lat;
+        const mag2 = dx * dx + dy * dy;
+
+        let t = (mag2 !== 0) ? (x * dx + y * dy) / mag2 : 0;
+        t = Math.max(0, Math.min(1, t));
+
+        const diffM = Math.abs(d2.totalM - d1.totalM);
+        const finalTotalM = A.m + Math.round(diffM * t);
+
+        const finalKm = A.data.hasHyphen ? A.data.km : Math.floor(finalTotalM / 1000);
+        const finalBranch = A.data.hasHyphen ? Math.floor((finalTotalM - (A.data.km * 1000)) / 1000) : 0;
+        const finalM = A.data.hasHyphen ? (finalTotalM - (A.data.km * 1000)) % 1000 : finalTotalM % 1000;
+
+        if (A.data.hasHyphen) {
+          return finalKm + "-" + finalBranch + "k" + finalM.toString().padStart(3, '0');
+        } else {
+          return finalKm + "k" + finalM.toString().padStart(3, '0');
+        }
+      }
+
+      function calculateDistance(lat1, lng1, lat2, lng2) {
+        const R = 6371000;
+        const r1 = lat1 * Math.PI / 180;
+        const r2 = lat2 * Math.PI / 180;
+        const dLng = (lng2 - lng1) * Math.PI / 180;
+        let c = Math.sin(r1) * Math.sin(r2) + Math.cos(r1) * Math.cos(r2) * Math.cos(dLng);
+        c = Math.min(1, Math.max(-1, c)); // 浮動小数点誤差でacosの引数が±1を超えNaNになるのを防ぐ
+        return Math.acos(c) * R;
+      }
+
+      // 前回の値を記憶する変数（関数の外に追加）
+      let lastDisplayedKP = null;
+
+      // 現在のGPS座標を文字列で返す
+      function _latText() { return (currentGpsLat !== null) ? currentGpsLat.toFixed(6) : "---"; }
+      function _lngText() { return (currentGpsLng !== null) ? currentGpsLng.toFixed(6) : "---"; }
+
+      // 圏外表示中は緯度経度の部分だけを書き換える（全体は再描画しない）
+      function _updateOutOfRangeCoords() {
+        const el = document.getElementById("oor-coord");
+        if (!el) return;
+        el.textContent = "緯度 " + _latText() + " / 経度 " + _lngText();
+      }
+
+      function showResult(res) {
+        // ★同じKP値なら表示を更新しない（圏外中は緯度経度だけリアルタイム更新）
+        if (res.status === lastDisplayedKP) {
+          if (res.status === "圏外です") _updateOutOfRangeCoords();
+          return;
+        }
+        lastDisplayedKP = res.status;
+        const siteUrl = "https://x.com/hagihosyu";
+        latestKiloPost = res.status;
+
+        let displayStatus = res.status;
+        if (res.status === "圏外です") {
+          displayStatus = '圏外<span style="font-size:0.5em;">です</span>' +
+            '<br><span id="oor-coord" style="font-size:0.3em;">緯度 ' + _latText() +
+            ' / 経度 ' + _lngText() + '</span>';
+        }
+
+        let drawingHtml = "";
+        if (res.status !== "圏外です" && res.drawing) {
+          let fileId = "";
+          if (res.drawing.indexOf('/d/') > -1) {
+            fileId = res.drawing.split('/d/')[1].split('/')[0];
+          } else if (res.drawing.indexOf('id=') > -1) {
+            fileId = res.drawing.split('id=')[1].split('&')[0];
+          }
+          if (fileId) {
+            const directUrl = "https://drive.google.com/file/d/" + fileId + "/view";
+            drawingHtml =
+              '<div class="drawing-container">' +
+              '<span class="drawing-label">この付近の図面が見つかりました</span>' +
+              '<a href="' + directUrl + '" target="_blank" class="btn-drawing">📄 図面(PDF)を開く 📄</a>' +
+              '</div>';
+          }
+        }
+
+        let shareButtonHtml = "";
+        let cameraButtonHtml = "";
+        let fallButtonHtml = "";
+        let shakanTestButtonHtml = "";
+        let mapButtonHtml = "";
+        let kpSearchButtonHtml = "";
+        let patrolButtonHtml = "";
+        const CAR_SVG = '<svg class="car-ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="#ffd11a" d="M5 11l1.3-3.9C6.6 6.2 7.4 5.6 8.3 5.6h7.4c.9 0 1.7.6 2 1.5L19 11l1.4.5c.4.1.6.5.6.9V17c0 .6-.4 1-1 1h-1c-.6 0-1-.4-1-1v-1H6v1c0 .6-.4 1-1 1H4c-.6 0-1-.4-1-1v-4.6c0-.4.2-.8.6-.9L5 11z"/><path fill="#fff3b0" d="M7.6 7.6l-.8 3h10.4l-.8-3c-.1-.4-.5-.7-.95-.7H8.55c-.45 0-.85.3-.95.7z"/><circle cx="7.5" cy="15.5" r="1.5" fill="#333"/><circle cx="16.5" cy="15.5" r="1.5" fill="#333"/></svg>';
+        const PIN_SVG = '<svg class="pin-ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="#e53935" d="M12 2c-3.9 0-7 3.1-7 7 0 5.2 7 13 7 13s7-7.8 7-13c0-3.9-3.1-7-7-7z"/><circle cx="12" cy="9" r="2.6" fill="#fff"/></svg>';
+        cameraButtonHtml = '<button onclick="openCamera()" class="btn-camera">📷 カメラを起動 📷</button>';
+        fallButtonHtml = '<button onclick="openFallCamera()" class="btn-camera-fall">📷 落下物を撮影 📷</button>';
+        shakanTestButtonHtml = '<button onclick="openShakanTestCamera()" class="btn-shakan-test">🧪 写管屋 4パターンテスト</button>';
+        patrolButtonHtml = '<button onclick="openPatrol()" class="btn-patrol">' + CAR_SVG + ' 道路点検 ' + CAR_SVG + '</button>';
+        if (res.status !== "圏外です") {
+          mapButtonHtml = '<button onclick="openMapModal()" class="btn-map">' + PIN_SVG + ' 現在位置を表示 ' + PIN_SVG + '</button>';
+        }
+        kpSearchButtonHtml = '<button onclick="openKpSearch()" class="btn-kpsearch">🔢 距離標から図面 🔢</button>';
+        shareButtonHtml = '<button onclick="shareKP()" class="btn-share">📤 距離標のコピペ 📤</button>';
+
+        document.getElementById("status").innerHTML = "R191萩保守管内距離標";
+        document.getElementById("output").innerHTML =
+          '<span class="kilo-post">' + displayStatus + '</span>' +
+          '<div><span class="distance-display">マスタ ' + res.baseMaster + ' から ' + res.distance + '</span></div>' +
+          drawingHtml +
+          patrolButtonHtml +
+          mapButtonHtml +
+          kpSearchButtonHtml +
+          cameraButtonHtml +
+          fallButtonHtml +
+          shakanTestButtonHtml +
+          shareButtonHtml +
+          '<a href="' + siteUrl + '" target="_top" class="btn-back">🔗 X.com/萩保守 🔗</a>' +
+          '<div class="info-box">' +
+          '<span class="info-title">【いろいろ説明v3.76】</span>' +         
+          '・周囲の環境により5～10m以上の誤差が生じる場合があります。<br>' +
+          '・ver3.76：ライトのボタンが 消灯→フラッシュ（撮影時だけ光る）→常時点灯 の切り替えになりました。<br>' +
+          '・ver3.75：写真にExif（撮影日時・GPSの緯度経度・距離標）を入れるようにしました。<br>' +
+          '・ver3.74：落下物の3枚に SHA-256（改ざん検出用のハッシュ）を付けて保存します。確認画面にも表示されます。<br>' +
+          '・ver3.73：撮影中にライト（懐中電灯）のON/OFFができます（対応端末のみ）。写真に焼き込む文字から日時を外しました。<br>' +
+          '・ver3.72：落下物は1枚目を撮った瞬間の距離標で3枚とも固定。LINE送信・ファイル名・地図リンクも同じ値にそろえました。<br>'  +
+          '・ver3.71：落下物撮影の画角を自動切替（処理前・処理後＝広角／近景＝標準）。超広角カメラが無い端末では標準のままです。<br>' +
+          '・ver3.7：圏外時の緯度経度がリアルタイム表示になり、写真にも焼き込まれます。LINE送信に緯度経度と地図リンク（押すと地図が開く）を追加。距離標を打ち込んで図面を開けるようにしました（図面表示は通信が必要です）。<br>' +
+          '・落下物撮影：処理前→近景→処理後の3枚を撮って、まとめてクラウド（Google Drive）に保存できます。<br>' +
+          '・バージョン更新がたまにありますのでインストールしている方は最新版に更新してください。<br>' + 
+          '・ver3.6：撮影機能追加⇒写真内に日時と距離標を表示して撮影できます。<br>' +
+          '・ver3.5：PWA版に改良しました。インストールすると通信環境がないところでもいけます。附図表示機能は通信できるとこでお願いします。<br>' +          
+          '・ver3.0：距離標共有機能追加⇒lineなどに距離標を共有できます。SiteBoxにはコピペで対応ください。<br>' +
+          '・ver2.3：附図を最新版に更新しました<br>' +          
+          '・ver2.5：距離標がリアルタイムで表示されるように改良しました<br>' +
+          '・ver2.0：附図が表示できるようになりました。<br>' +
+          '</div>';
+        setTimeout(function() {
+  const kpEl = document.querySelector('.kilo-post');
+  const container = document.getElementById('result');
+  if (!kpEl || !container) return;
+  kpEl.style.transform = 'scaleX(1)';
+  const textW = kpEl.scrollWidth;
+  const maxW  = container.clientWidth - 10;
+  if (textW > maxW) {
+    const scale = Math.max(0.2, maxW / textW);
+    kpEl.style.transform = `scaleX(${scale})`;
+  }
+}, 50);
+       }
+
+      async function shareKP() {
+        let text = latestKiloPost;
+        if (latestKiloPost === "圏外です") text = "R191 圏外" + _locLines();
+        try {
+          if (navigator.share) {
+            await navigator.share({ title: "R191萩保守距離標", text: text });
+          } else {
+            await navigator.clipboard.writeText(text);
+            alert("距離標をコピーしました\n\n" + text);
+          }
+        } catch (e) { console.log(e); }
+      }
+
+      // ===== カメラ機能 =====
+      let cameraStream = null;
+      let capturedBlob = null;
+      let capturedKP = null;    // 撮影した瞬間の距離標（写真に焼き込んだ値）
+      let capturedLat = null;   // 撮影した瞬間の緯度
+      let capturedLng = null;   // 撮影した瞬間の経度
+      let cameraMode = 'normal'; // 'normal'=通常撮影 / 'patrol'=その他異常(巡回送信) / 'fall'=落下物3枚撮影
+      let kpLocked = false;     // 距離標を固定中か
+      let lockedKP = null;      // 固定時の距離標
+      let camKpTimer = null;    // 下部テキストのリアルタイム更新タイマー
+
+      // 圏外のときは距離標の代わりに緯度経度を付ける（写真の焼き込み・送信用）
+      function _kpWithCoords(kp) {
+        if (kp !== "圏外です") return kp;
+        return '圏外 ' + _latText() + ',' + _lngText();
+      }
+
+      // ファイル名に使える形へ（圏外時の緯度経度もそのまま残す）
+      function _kpFileName(kp) {
+        return String(kp).replace(/圏外/g, 'OOR')
+                         .replace(/[^a-zA-Z0-9_.\-]+/g, '_')
+                         .replace(/^_+|_+$/g, '');
+      }
+
+      // 現在有効な距離標（固定中は固定値、それ以外は最新値／圏外なら緯度経度）
+      function _currentKP() {
+        return (kpLocked && lockedKP !== null) ? lockedKP : _kpWithCoords(latestKiloPost);
+      }
+
+      // 下部テキストを枠幅に合わせて自動縮小（基準18px、はみ出す場合のみ縮小）
+      function _fitKpText() {
+        const overlay = document.getElementById('camera-kp-overlay');
+        const el = document.getElementById('camera-kp-text');
+        if (!overlay || !el) return;
+        el.style.fontSize = '18px';
+        const cs = getComputedStyle(overlay);
+        const avail = overlay.clientWidth
+          - (parseFloat(cs.paddingLeft) || 0)
+          - (parseFloat(cs.paddingRight) || 0);
+        const textW = el.getBoundingClientRect().width;
+        if (avail > 0 && textW > avail) {
+          el.style.fontSize = Math.max(9, Math.floor(18 * avail / textW)) + 'px';
+        }
+      }
+
+      // ライブプレビュー中、下部テキストを一定間隔で更新
+      function _startCamKpTimer() {
+        _stopCamKpTimer();
+        const tick = function() {
+          const el = document.getElementById('camera-kp-text');
+          if (el) { el.textContent = _getOverlayText(); _fitKpText(); }
+        };
+        tick();   // 即時1回
+        camKpTimer = setInterval(tick, 500);
+      }
+      function _stopCamKpTimer() {
+        if (camKpTimer) { clearInterval(camKpTimer); camKpTimer = null; }
+      }
+
+      // 距離標の固定/解除トグル
+      function toggleKpLock() {
+        kpLocked = !kpLocked;
+        const btn = document.getElementById('btn-lock');
+        if (kpLocked) {
+          lockedKP = _kpWithCoords(latestKiloPost);   // 押した瞬間の距離標（圏外なら緯度経度）で固定
+          btn.textContent = '解除';
+          btn.classList.add('locked');
+        } else {
+          lockedKP = null;
+          btn.textContent = '距離標固定';
+          btn.classList.remove('locked');
+        }
+        const el = document.getElementById('camera-kp-text');
+        if (el) { el.textContent = _getOverlayText(); _fitKpText(); }   // 即時反映
+      }
+
+      // 固定状態を初期化（カメラを開くたびに解除状態へ）
+      function _resetKpLock() {
+        kpLocked = false;
+        lockedKP = null;
+        const btn = document.getElementById('btn-lock');
+        if (btn) { btn.textContent = '距離標固定'; btn.classList.remove('locked'); }
+      }
+
+      function _getOverlayText() {
+        // 落下物モードは工程名（処理前／近景／処理後）を焼き込む
+        // 日時は焼き込まない（写真のプロパティとファイル名には残ります）
+        const stage = (cameraMode === 'fall') ? ('_' + FALL_STEPS[fallStep]) : '';
+        return '--R191_' + _currentKP() + stage + '_hagihosyukouji--';
+      }
+
+      // 巡回点検「その他異常」用：撮影後にLINE送信モードでカメラを開く
+      function openPatrolCamera() {
+        openCamera('patrol');
+      }
+
+      // 落下物：処理前 → 近景 → 処理後 の3枚撮影モードでカメラを開く
+      function openFallCamera() {
+        fallShots = [null, null, null];
+        fallStep = 0;
+        fallRetakeIndex = null;
+        fallGroupId = 'FO' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+        openCamera('fall');
+      }
+
+      // ===== ライト：消灯 / フラッシュ（撮影時だけ光る）/ 常時点灯 =====
+      let lightMode = 'off';        // 'off' | 'flash' | 'torch'
+      let torchOn = false;          // いまLEDが点いているか
+      const FLASH_WAIT_MS = 500;    // 点灯してから撮るまでの待ち（明るさが落ち着くまで）
+
+      function _torchTrack() {
+        return cameraStream ? cameraStream.getVideoTracks()[0] : null;
+      }
+
+      // この端末・このカメラでライトが使えるか
+      function _torchSupported() {
+        const t = _torchTrack();
+        if (!t || !t.getCapabilities) return false;
+        try { return !!(t.getCapabilities() || {}).torch; } catch (e) { return false; }
+      }
+
+      async function _applyTorch(on) {
+        const t = _torchTrack();
+        if (!t || !_torchSupported()) return false;
+        try {
+          await t.applyConstraints({ advanced: [{ torch: !!on }] });
+          return true;
+        } catch (e) { return false; }
+      }
+
+      // 押すたびに 消灯 → フラッシュ → 常時点灯 → 消灯
+      async function cycleLight() {
+        if (!_torchSupported()) return;
+        lightMode = (lightMode === 'off')   ? 'flash'
+                  : (lightMode === 'flash') ? 'torch' : 'off';
+        const ok = await _applyTorch(lightMode === 'torch');
+        torchOn = (lightMode === 'torch') && ok;
+        _updateTorchButton();
+      }
+
+      // 撮影の瞬間だけ光らせる（フラッシュ）。光らせたら true
+      async function _flashBefore() {
+        if (lightMode !== 'flash' || !_torchSupported()) return false;
+        const ok = await _applyTorch(true);
+        if (!ok) return false;
+        torchOn = true;
+        _updateTorchButton();
+        await new Promise(function(r) { setTimeout(r, FLASH_WAIT_MS); });
+        return true;
+      }
+
+      async function _flashAfter() {
+        await _applyTorch(false);
+        torchOn = false;
+        _updateTorchButton();
+      }
+
+      // ライトボタンの表示・状態を更新（ライブ映像のときだけ出す）
+      const LIGHT_VIEW = {
+        off:   { icon: '🔦', text: 'ライト',   label: 'ライト：消灯。押すとフラッシュ' },
+        flash: { icon: '⚡', text: 'フラッシュ', label: 'フラッシュ：撮影時だけ光る。押すと常時点灯' },
+        torch: { icon: '🔦', text: '常時点灯', label: '常時点灯。押すと消灯' }
+      };
+      function _updateTorchButton() {
+        const btn = document.getElementById('btn-torch');
+        const lab = document.getElementById('light-label');
+        if (!btn) return;
+        const live = document.getElementById('btn-capture').style.display !== 'none';
+        const show = live && _torchSupported();
+        const v = LIGHT_VIEW[lightMode] || LIGHT_VIEW.off;
+        btn.style.display = show ? 'flex' : 'none';
+        btn.textContent = v.icon;
+        btn.classList.toggle('on', lightMode !== 'off');
+        btn.setAttribute('aria-label', v.label);
+        btn.setAttribute('title', v.label);
+        if (lab) {
+          lab.style.display = show ? 'block' : 'none';
+          lab.textContent = v.text;
+        }
+      }
+
+      // ===== 画角（レンズ）切り替え =====
+      // 落下物モードの画角：処理前=広角 / 近景=標準 / 処理後=広角
+      const FALL_LENS = ['wide', 'normal', 'wide'];
+      let cameraLens = null;         // いま要求している画角 'wide' | 'normal'
+      let cameraWideOk = false;      // 実際に広角にできたか
+      let ultraWideId = null;        // 超広角カメラの deviceId（見つかった場合）
+
+      // 超広角カメラを探す（ラベルは撮影許可後でないと取得できない）
+      async function _findUltraWideId() {
+        if (ultraWideId) return ultraWideId;
+        try {
+          const list = await navigator.mediaDevices.enumerateDevices();
+          const cams = list.filter(function(d) { return d.kind === 'videoinput'; });
+          if (!cams.some(function(d) { return d.label; })) return null;   // 許可前はラベルが空
+          const hit = cams.find(function(d) {
+            return /超広角|ultra[\s-]?wide/i.test(d.label) && !/front|前面/i.test(d.label);
+          });
+          ultraWideId = hit ? hit.deviceId : null;
+        } catch (e) { return null; }
+        return ultraWideId;
+      }
+
+      function _stopCameraStream() {
+        if (torchOn) _applyTorch(false);
+        if (cameraStream) {
+          cameraStream.getTracks().forEach(function(t) { t.stop(); });
+          cameraStream = null;
+        }
+      }
+
+      // 指定した画角でカメラを起動（広角が使えない端末は標準のまま）
+      async function _startCameraStream(lens, retried) {
+        _stopCameraStream();
+        let devId = (lens === 'wide') ? await _findUltraWideId() : null;
+
+        const video = { width: { ideal: 1920 }, height: { ideal: 1080 } };
+        if (devId) video.deviceId = { exact: devId };
+        else       video.facingMode = { ideal: 'environment' };
+
+        let stream = null;
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ video: video });
+        } catch (e) {
+          if (!devId) { closeCamera(); return; }
+          devId = null;   // 超広角の指定に失敗 → 標準で開き直す
+          try {
+            stream = await navigator.mediaDevices.getUserMedia({
+              video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }
+            });
+          } catch (e2) { closeCamera(); return; }
+        }
+
+        // 起動待ちの間に閉じられていたら破棄する
+        if (document.getElementById('camera-modal').style.display !== 'flex') {
+          stream.getTracks().forEach(function(t) { t.stop(); });
+          return;
+        }
+
+        cameraStream = stream;
+        cameraLens = lens;
+        cameraWideOk = !!devId;
+        document.getElementById('camera-video').srcObject = stream;
+
+        // 初回は許可前でラベルが読めず超広角を探せないため、許可後に一度だけ探し直す
+        if (lens === 'wide' && !devId && !retried) {
+          const id2 = await _findUltraWideId();
+          if (id2) { _startCameraStream(lens, true); return; }
+        }
+
+        // 超広角カメラが無い端末でも、ズームが使えれば最小倍率＝いちばん広い画角にする
+        const track = stream.getVideoTracks()[0];
+        if (!devId && track && track.getCapabilities) {
+          const caps = track.getCapabilities() || {};
+          if (caps.zoom) {
+            const z = (lens === 'wide')
+              ? caps.zoom.min
+              : Math.min(Math.max(1, caps.zoom.min), caps.zoom.max);
+            try {
+              await track.applyConstraints({ advanced: [{ zoom: z }] });
+              if (lens === 'wide' && caps.zoom.min < 1) cameraWideOk = true;
+            } catch (e) {}
+          }
+        }
+        if (cameraMode === 'fall') _fallUpdateBadge();
+
+        // ライト：常時点灯のままレンズを切り替えたときは点け直す
+        if (lightMode === 'torch') { torchOn = await _applyTorch(true); }
+        _updateTorchButton();
+        setTimeout(_updateTorchButton, 600);   // 対応状況が遅れて分かる端末むけ
+      }
+
+      // 落下物モードで、いまの工程に合った画角へ切り替える
+      function _applyFallLens() {
+        if (cameraMode !== 'fall') return;
+        const want = FALL_LENS[fallStep] || 'normal';
+        if (want === cameraLens) return;
+        _startCameraStream(want);
+      }
+
+      function openCamera(patrol) {
+        // 後方互換：true が渡された場合は 'patrol' 扱い
+        cameraMode = (patrol === true) ? 'patrol' : (patrol || 'normal');
+        const modal = document.getElementById('camera-modal');
+        _resetKpLock();
+        document.getElementById('camera-kp-text').textContent = _getOverlayText();
+        document.getElementById('camera-video').style.display = 'block';
+        document.getElementById('camera-canvas').style.display = 'none';
+        document.getElementById('crop-guide').style.display = 'block';
+        document.getElementById('camera-kp-overlay').style.display = 'block';
+        document.getElementById('btn-lock').style.display = 'block';
+        document.getElementById('btn-capture').style.display = 'block';
+        document.getElementById('btn-retake').style.display = 'none';
+        document.getElementById('btn-save').style.display = 'none';
+        document.getElementById('btn-patrol-send').style.display = 'none';
+        document.getElementById('btn-fall-next').style.display = 'none';
+        document.getElementById('fall-review').style.display = 'none';
+        const stp = document.getElementById('shakan-test-panel');
+        if (stp) stp.style.display = (cameraMode === 'shakan') ? 'block' : 'none';
+        document.getElementById('fall-step-badge').style.display = (cameraMode === 'fall') ? 'block' : 'none';
+        document.getElementById('fall-thumbs').style.display = (cameraMode === 'fall') ? 'flex' : 'none';
+        if (cameraMode === 'fall') { _fallUpdateBadge(); _fallUpdateThumbs(); }
+        capturedBlob = null;
+        lightMode = 'off';
+        torchOn = false;
+        _updateTorchButton();
+        _startCamKpTimer();   // 下部テキストをリアルタイム更新開始
+
+        document.documentElement.appendChild(modal);
+        modal.style.display = 'flex';
+
+        _startCameraStream(cameraMode === 'fall' ? FALL_LENS[fallStep] : 'normal');
+      }
+
+      async function capturePhoto() {
+        const video  = document.getElementById('camera-video');
+        const canvas = document.getElementById('camera-canvas');
+
+        // 映像がまだ来ていないうちに押された場合は撮らない（真っ黒な写真を防ぐ）
+        if (!video.videoWidth || video.readyState < 2) return;
+
+        // 写管屋比較テストは、通常/落下物とは別処理で同一フレームから4種を同時生成
+        if (cameraMode === 'shakan') {
+          await captureShakanFourPatterns(video, canvas);
+          return;
+        }
+
+        // 落下物の1枚目を撮った瞬間に距離標を固定（残り2枚も同じ距離標にする）
+        const shotIdx = (fallRetakeIndex !== null) ? fallRetakeIndex : fallStep;
+        if (cameraMode === 'fall' && shotIdx === 0 && !kpLocked) toggleKpLock();
+
+        // 写真に焼き込む距離標＝送信・ファイル名にも使う値
+        capturedKP = _currentKP();
+        capturedLat = currentGpsLat;
+        capturedLng = currentGpsLng;
+
+        const OUT_W = 1280;
+        const OUT_H = 960;
+        canvas.width  = OUT_W;
+        canvas.height = OUT_H;
+        const ctx = canvas.getContext('2d');
+
+        // スマホ縦持ちの映像（縦長）から、ガイド枠に対応する横長部分をクロップ
+        // 枠は画面幅=映像幅全体、高さは幅の75%（4:3比率）を縦中央から取る
+        const vw = video.videoWidth  || OUT_W;
+        const vh = video.videoHeight || OUT_H;
+
+        // 縦映像の中央から4:3サイズを切り出す
+        const cropW = vw;                    // 横はフル幅
+        const cropH = vw * (OUT_H / OUT_W); // 高さ = 幅 × (960/1280) = 幅 × 0.75
+        const cropX = 0;
+        const cropY = (vh - cropH) / 2;     // 縦中央からクロップ
+
+        // フラッシュ設定なら、光らせてから1枚
+        const flashed = await _flashBefore();
+        ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, OUT_W, OUT_H);
+        if (flashed) _flashAfter();
+
+        // 下端に黒帯＋白文字ゴシック1行
+        const overlayText = _getOverlayText();
+        const FONT = (px) => `bold ${px}px "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif`;
+        // 圏外時は緯度経度が入って長くなるため、はみ出す場合は自動で縮小
+        let fontSize = 22;
+        ctx.font = FONT(fontSize);
+        const maxTextW = OUT_W - 28;
+        const measuredW = ctx.measureText(overlayText).width;
+        if (measuredW > maxTextW) {
+          fontSize = Math.max(11, Math.floor(fontSize * maxTextW / measuredW));
+        }
+        const bandH   = fontSize + 16;
+        const bandY   = OUT_H - bandH;
+
+        ctx.fillStyle = 'rgba(0,0,0,0.82)';
+        ctx.fillRect(0, bandY, OUT_W, bandH);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = FONT(fontSize);
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(overlayText, 14, bandY + bandH / 2);
+
+        // プレビュー表示に切り替え
+        _stopCamKpTimer();   // 撮影値で確定するため更新停止
+        document.getElementById('btn-torch').style.display = 'none';
+        document.getElementById('light-label').style.display = 'none';
+        video.style.display = 'none';
+        canvas.style.display = 'block';
+        document.getElementById('crop-guide').style.display = 'none';
+        document.getElementById('camera-kp-overlay').style.display = 'none';
+        document.getElementById('btn-lock').style.display = 'none';
+        document.getElementById('btn-capture').style.display = 'none';
+        document.getElementById('btn-retake').style.display = 'block';
+        if (cameraMode === 'patrol') {
+          document.getElementById('btn-save').style.display = 'none';
+          document.getElementById('btn-patrol-send').style.display = 'block';
+          document.getElementById('btn-fall-next').style.display = 'none';
+        } else if (cameraMode === 'fall') {
+          document.getElementById('btn-save').style.display = 'none';
+          document.getElementById('btn-patrol-send').style.display = 'none';
+          const nb = document.getElementById('btn-fall-next');
+          nb.style.display = 'block';
+          // 撮り直し中は「確定」、通常は「次へ」／3枚目は「確認へ」
+          nb.textContent = (fallRetakeIndex !== null) ? '確定'
+                         : (fallStep >= FALL_STEPS.length - 1 ? '確認へ' : '次へ');
+        } else {
+          document.getElementById('btn-save').style.display = 'block';
+          document.getElementById('btn-patrol-send').style.display = 'none';
+          document.getElementById('btn-fall-next').style.display = 'none';
+        }
+
+        // Exif（撮影日時・GPS・距離標）を書き込んでから確定する
+        const shotDate  = new Date();
+        const shotStage = (cameraMode === 'fall') ? FALL_STEPS[fallStep] : '';
+        const shotKP    = capturedKP;
+        const shotLat   = capturedLat;
+        const shotLng   = capturedLng;
+        canvas.toBlob(function(blob) {
+          _jpegWithExif(blob, {
+            date: shotDate,
+            lat:  shotLat,
+            lng:  shotLng,
+            width: OUT_W,
+            height: OUT_H,
+            description: ('R191 ' + _kpFileName(shotKP || '') +
+                          (shotStage ? ' ' + (STAGE_EN[shotStage] || '') : '')),
+            comment: ('R191 ' + (shotKP || '') + (shotStage ? ' ' + shotStage : ''))
+          }).then(function(b) { capturedBlob = b; });
+        }, 'image/jpeg', 0.92);
+      }
+
+      function retakePhoto() {
+        capturedBlob = null;
+        capturedKP = null;
+        capturedLat = null;
+        capturedLng = null;
+        document.getElementById('camera-video').style.display = 'block';
+        document.getElementById('camera-canvas').style.display = 'none';
+        document.getElementById('crop-guide').style.display = 'block';
+        document.getElementById('camera-kp-overlay').style.display = 'block';
+        document.getElementById('btn-lock').style.display = 'block';
+        document.getElementById('btn-capture').style.display = 'block';
+        document.getElementById('btn-retake').style.display = 'none';
+        document.getElementById('btn-save').style.display = 'none';
+        document.getElementById('btn-patrol-send').style.display = 'none';
+        document.getElementById('btn-fall-next').style.display = 'none';
+        _startCamKpTimer();   // ライブに戻るため更新再開
+        _updateTorchButton();
+        _applyFallLens();     // 工程に合った画角（処理前・処理後=広角／近景=標準）へ
+      }
+
+      async function savePhoto() {
+        if (!capturedBlob) return;
+        const safeName = _kpFileName(_currentKP());
+        const fileName = 'R191_' + safeName + '_hagihosyu.jpg';
+        const file = new File([capturedBlob], fileName, { type: 'image/jpeg' });
+
+        // 共有シート（iOS：「写真に保存」が選べる）
+        if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+          try {
+            await navigator.share({
+              title: 'R191萩保守 ' + _currentKP(),
+              files: [file]
+            });
+            return;
+          } catch(e) { /* キャンセルや失敗時はダウンロードへ */ }
+        }
+        // フォールバック：ダウンロード
+        const url = URL.createObjectURL(capturedBlob);
+        const a = document.createElement('a');
+        a.href = url; a.download = fileName;
+        document.body.appendChild(a); a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+
+
+      // ===== 図面表示機能 =====
+      let mapScale = 1;
+      let mapOffX = 0;
+      let mapOffY = 0;
+      let mapImg = null;
+      let mapCurrentFile = null;
+      let mapCurrentKP = null;
+      let mapTargetPoint = null;   // 距離標入力で表示中の目標地点 {label, x, y}
+      let mapCurrentLat = null;
+      let mapCurrentLng = null;
+
+      // 現在地のGPS座標を保持
+      let currentGpsLat = null;
+      let currentGpsLng = null;
+
+      function openMapModal() {
+        mapTargetPoint = null;   // 現在地モードで開く
+        const modal = document.getElementById('map-modal');
+        modal.style.display = 'flex';
+        document.getElementById('map-status').textContent = '現在地を取得中...';
+
+        // 図面を開く瞬間に最新のGPSを取り直す（前回位置のキャッシュ対策）
+        const proceed = function() {
+          const nearest = findNearestWithMap(currentGpsLat, currentGpsLng);
+          if (!nearest) {
+            modal.style.display = 'none';
+            alert('この位置に対応する図面がありません。');
+            return;
+          }
+          mapCurrentKP = nearest;
+          loadAndShowMap(nearest.map, nearest);
+        };
+
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            function(pos) {
+              currentGpsLat = pos.coords.latitude;
+              currentGpsLng = pos.coords.longitude;
+              proceed();
+            },
+            function() { proceed(); },   // 取得失敗時は直近の値で開く
+            { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+          );
+        } else {
+          proceed();
+        }
+      }
+
+      function findNearestWithMap(lat, lng) {
+        if (lat === null || lng === null) return null;
+        let best = null;
+        let bestDist = Infinity;
+        for (const p of MASTER_DATA) {
+          if (!p.map) continue;
+          const d = calculateDistance(lat, lng, p.lat, p.lng);
+          if (d < bestDist) { bestDist = d; best = p; }
+        }
+        // 同じmap内で最近傍を探す（図面全体を読み込むため代表KPとして使用）
+        if (!best) return null;
+        // 同じmapファイルの全KPを返す（座標変換用）
+        best._mapPoints = MASTER_DATA.filter(p => p.map === best.map && p.x !== null && p.y !== null);
+        return best;
+      }
+
+      function loadAndShowMap(mapFile, nearestKP) {
+        const modal = document.getElementById('map-modal');
+        modal.style.display = 'flex';
+        document.getElementById('map-modal-title').textContent = '図面: ' + mapFile;
+        document.getElementById('map-status').textContent = '読み込み中...';
+
+        mapImg = new Image();
+        mapImg.onload = function() {
+          if (!mapImg) return;   // 読み込み中に閉じられた場合
+          mapCurrentFile = mapFile;
+          initMapView(nearestKP);
+        };
+        mapImg.onerror = function() {
+          document.getElementById('map-status').textContent = 'ファイルが見つかりません: ' + mapFile;
+        };
+        mapImg.src = mapFile;
+      }
+
+      function initMapView(nearestKP) {
+        const wrap = document.getElementById('map-canvas-wrap');
+        const canvas = document.getElementById('map-canvas');
+        const W = wrap.clientWidth;
+        const H = wrap.clientHeight;
+        const iW = mapImg.naturalWidth;
+        const iH = mapImg.naturalHeight;
+
+        canvas.width = iW;
+        canvas.height = iH;
+
+        // 初期スケール：画面幅に合わせる
+        const baseScale = W / iW;
+
+        // GPS→ピクセル変換（基準点が2点以上あれば使用、なければ中央表示）
+        let focusX = iW / 2;
+        let focusY = iH / 2;
+
+        const pts = nearestKP._mapPoints;
+        if (mapTargetPoint && mapTargetPoint.x !== null) {
+          focusX = mapTargetPoint.x;
+          focusY = mapTargetPoint.y;
+        } else if (pts && pts.length >= 2 && currentGpsLat !== null) {
+          const converted = gpsToPixel(currentGpsLat, currentGpsLng, pts);
+          if (converted) { focusX = converted.x; focusY = converted.y; }
+        } else if (nearestKP.x !== null) {
+          focusX = nearestKP.x;
+          focusY = nearestKP.y;
+        }
+
+        // 現在地を中心に、図面の高さが収まる程度＝広めに表示
+        const fitH = H / iH;
+        mapScale = fitH * 1.5;
+        mapOffX = W / 2 - focusX * mapScale;
+        mapOffY = H / 2 - focusY * mapScale;
+
+        drawMap();
+        updateMapStatus(focusX, focusY, pts && pts.length >= 2);
+      }
+
+      function gpsToPixel(lat, lng, pts) {
+        // 最近傍2点でアフィン変換（簡易版）
+        if (pts.length < 2) return null;
+
+        // 現在地に最も近い2点を選ぶ
+        const sorted = pts.slice().sort((a, b) => {
+          const da = Math.pow(a.lat - lat, 2) + Math.pow(a.lng - lng, 2);
+          const db = Math.pow(b.lat - lat, 2) + Math.pow(b.lng - lng, 2);
+          return da - db;
+        });
+        const p1 = sorted[0];
+        const p2 = sorted[1];
+
+        const dLatGps = p2.lat - p1.lat;
+        const dLngGps = p2.lng - p1.lng;
+        const dXPx  = p2.x - p1.x;
+        const dYPx  = p2.y - p1.y;
+        const lenGps2 = dLatGps * dLatGps + dLngGps * dLngGps;
+        if (lenGps2 === 0) return { x: p1.x, y: p1.y };
+
+        const t = ((lat - p1.lat) * dLatGps + (lng - p1.lng) * dLngGps) / lenGps2;
+        return {
+          x: p1.x + t * dXPx,
+          y: p1.y + t * dYPx
+        };
+      }
+
+      function drawMap() {
+        const canvas = document.getElementById('map-canvas');
+        const ctx = canvas.getContext('2d');
+        const iW = mapImg.naturalWidth;
+        const iH = mapImg.naturalHeight;
+
+        ctx.clearRect(0, 0, iW, iH);
+        ctx.drawImage(mapImg, 0, 0);
+
+        // 距離標入力モードは目標地点、それ以外は現在地を描画
+        const pts = mapCurrentKP ? mapCurrentKP._mapPoints : [];
+        if (mapTargetPoint) {
+          if (mapTargetPoint.x !== null) {
+            drawLocationDot(ctx, mapTargetPoint.x, mapTargetPoint.y, '#1e88e5');
+          }
+        } else if (currentGpsLat !== null && pts && pts.length >= 2) {
+          const pos = gpsToPixel(currentGpsLat, currentGpsLng, pts);
+          if (pos) {
+            drawLocationDot(ctx, pos.x, pos.y);
+          }
+        } else if (mapCurrentKP && mapCurrentKP.x !== null) {
+          drawLocationDot(ctx, mapCurrentKP.x, mapCurrentKP.y);
+        }
+
+        // canvas の CSS transform でスケール・移動
+        canvas.style.transform = `translate(${mapOffX}px, ${mapOffY}px) scale(${mapScale})`;
+      }
+
+      function drawLocationDot(ctx, x, y, color) {
+        const r = Math.max(3, 8 / mapScale);
+        // 外側白リング
+        ctx.beginPath();
+        ctx.arc(x, y, r + 3, 0, Math.PI * 2);
+        ctx.fillStyle = 'white';
+        ctx.fill();
+        // 赤点
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fillStyle = color || '#e53935';
+        ctx.fill();
+        // 十字線
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = Math.max(1, 2 / mapScale);
+        ctx.beginPath();
+        ctx.moveTo(x - r * 2, y); ctx.lineTo(x + r * 2, y);
+        ctx.moveTo(x, y - r * 2); ctx.lineTo(x, y + r * 2);
+        ctx.stroke();
+      }
+
+      function updateMapStatus(focusX, focusY, hasCalibration) {
+        if (mapTargetPoint) {
+          document.getElementById('map-status').textContent =
+            '📌 距離標 ' + mapTargetPoint.label + ' 付近' +
+            (mapTargetPoint.x === null ? '（位置の目安なし）' : '');
+          return;
+        }
+        const label = mapCurrentKP ? mapCurrentKP.label : '';
+        const mode = hasCalibration ? '📍 現在地表示' : '⚠️ 基準点未設定（中央表示）';
+        document.getElementById('map-status').textContent = label + ' | ' + mode;
+      }
+
+      function closeMapModal() {
+        document.getElementById('map-modal').style.display = 'none';
+        mapImg = null;
+        mapCurrentFile = null;
+        mapTargetPoint = null;
+      }
+
+      // ===== 距離標を打ち込んで図面を表示 =====
+      // ラベル（例 "120k300" / "111-2k040"）を {prefix, m} に分解
+      function _parseLabel(label) {
+        const m = String(label).match(/^(\d+(?:-\d+)?)k(\d+)$/);
+        if (!m) return null;
+        return { prefix: m[1], m: parseInt(m[2], 10) };
+      }
+
+      // 図面を持つ距離標の「km（枝番含む）」一覧
+      function _kpPrefixList() {
+        const list = [];
+        MASTER_DATA.forEach(function(p) {
+          if (!p.map) return;
+          const d = _parseLabel(p.label);
+          if (d && list.indexOf(d.prefix) < 0) list.push(d.prefix);
+        });
+        list.sort(function(a, b) {
+          const A = a.split('-').map(Number);
+          const B = b.split('-').map(Number);
+          return (A[0] - B[0]) || ((A[1] || 0) - (B[1] || 0));
+        });
+        return list;
+      }
+
+      function openKpSearch() {
+        const sel = document.getElementById('kp-in-km');
+        if (!sel.options.length) {
+          _kpPrefixList().forEach(function(pref) {
+            const op = document.createElement('option');
+            op.value = pref;
+            op.textContent = pref;
+            sel.appendChild(op);
+          });
+        }
+        // 現在の距離標があれば初期値にする
+        const cur = _parseLabel(latestKiloPost);
+        if (cur) {
+          for (let i = 0; i < sel.options.length; i++) {
+            if (sel.options[i].value === cur.prefix) { sel.selectedIndex = i; break; }
+          }
+          document.getElementById('kp-in-m').value = cur.m;
+        }
+        document.getElementById('kp-modal-msg').textContent = '';
+        document.getElementById('kp-modal').style.display = 'flex';
+      }
+
+      function closeKpSearch() {
+        document.getElementById('kp-modal').style.display = 'none';
+      }
+
+      // 入力された距離標に最も近い（図面を持つ）マスタ点を探す
+      function _findKpPoint(prefix, meter) {
+        let best = null;
+        let bestDiff = Infinity;
+        MASTER_DATA.forEach(function(p) {
+          if (!p.map) return;
+          const d = _parseLabel(p.label);
+          if (!d || d.prefix !== prefix) return;
+          const diff = Math.abs(d.m - meter);
+          if (diff < bestDiff) { bestDiff = diff; best = p; }
+        });
+        return best;
+      }
+
+      function kpSearchGo() {
+        const prefix = document.getElementById('kp-in-km').value;
+        const meter  = parseInt(document.getElementById('kp-in-m').value, 10);
+        const msg    = document.getElementById('kp-modal-msg');
+        if (!prefix) { msg.textContent = 'km を選んでください'; return; }
+        if (isNaN(meter) || meter < 0 || meter > 999) {
+          msg.textContent = 'メートルは 0〜999 で入力してください';
+          return;
+        }
+        const target = _findKpPoint(prefix, meter);
+        if (!target) { msg.textContent = 'その距離標の図面が見つかりません'; return; }
+        closeKpSearch();
+        showMapForPoint(target);
+      }
+
+      // 指定した距離標の図面を開き、その位置に青マーカーを表示
+      function showMapForPoint(p) {
+        const pts = MASTER_DATA.filter(function(q) {
+          return q.map === p.map && q.x !== null && q.y !== null;
+        });
+        let px = null;
+        if (p.x !== null && p.x !== undefined) {
+          px = { x: p.x, y: p.y };
+        } else if (pts.length >= 2) {
+          px = gpsToPixel(p.lat, p.lng, pts);
+        } else if (pts.length === 1) {
+          px = { x: pts[0].x, y: pts[0].y };
+        }
+        mapTargetPoint = {
+          label: p.label,
+          x: px ? px.x : null,
+          y: px ? px.y : null
+        };
+        const base = Object.assign({}, p);
+        base._mapPoints = pts;
+        mapCurrentKP = base;
+        loadAndShowMap(p.map, base);
+        document.getElementById('map-modal-title').textContent = '距離標 ' + p.label + ' の図面';
+      }
+
+      // ===== タッチ・マウス操作 =====
+      (function() {
+        let isDragging = false;
+        let lastX, lastY;
+        let lastDist = null;
+
+        const getWrap = () => document.getElementById('map-canvas-wrap');
+
+        // マウス
+        document.addEventListener('mousedown', function(e) {
+          if (!e.target.closest('#map-canvas-wrap')) return;
+          isDragging = true; lastX = e.clientX; lastY = e.clientY;
+        });
+        document.addEventListener('mousemove', function(e) {
+          if (!isDragging || !mapImg) return;
+          mapOffX += e.clientX - lastX;
+          mapOffY += e.clientY - lastY;
+          lastX = e.clientX; lastY = e.clientY;
+          drawMap();
+        });
+        document.addEventListener('mouseup', function() { isDragging = false; });
+
+        // ホイールズーム
+        document.addEventListener('wheel', function(e) {
+          if (!e.target.closest('#map-canvas-wrap') || !mapImg) return;
+          e.preventDefault();
+          const wrap = getWrap();
+          const rect = wrap.getBoundingClientRect();
+          const cx = e.clientX - rect.left;
+          const cy = e.clientY - rect.top;
+          const delta = e.deltaY > 0 ? 0.85 : 1.18;
+          const newScale = Math.max(0.2, Math.min(20, mapScale * delta));
+          mapOffX = cx - (cx - mapOffX) * (newScale / mapScale);
+          mapOffY = cy - (cy - mapOffY) * (newScale / mapScale);
+          mapScale = newScale;
+          drawMap();
+        }, { passive: false });
+
+        // タッチ
+        document.addEventListener('touchstart', function(e) {
+          if (!e.target.closest('#map-canvas-wrap') || !mapImg) return;
+          if (e.touches.length === 1) {
+            isDragging = true;
+            lastX = e.touches[0].clientX; lastY = e.touches[0].clientY;
+          } else if (e.touches.length === 2) {
+            isDragging = false;
+            lastDist = Math.hypot(
+              e.touches[0].clientX - e.touches[1].clientX,
+              e.touches[0].clientY - e.touches[1].clientY
+            );
+          }
+        }, { passive: true });
+
+        document.addEventListener('touchmove', function(e) {
+          if (!e.target.closest('#map-canvas-wrap') || !mapImg) return;
+          e.preventDefault();
+          if (e.touches.length === 1 && isDragging) {
+            mapOffX += e.touches[0].clientX - lastX;
+            mapOffY += e.touches[0].clientY - lastY;
+            lastX = e.touches[0].clientX; lastY = e.touches[0].clientY;
+            drawMap();
+          } else if (e.touches.length === 2) {
+            const dist = Math.hypot(
+              e.touches[0].clientX - e.touches[1].clientX,
+              e.touches[0].clientY - e.touches[1].clientY
+            );
+            if (lastDist) {
+              const wrap = getWrap();
+              const rect = wrap.getBoundingClientRect();
+              const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left;
+              const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top;
+              const delta = dist / lastDist;
+              const newScale = Math.max(0.2, Math.min(20, mapScale * delta));
+              mapOffX = cx - (cx - mapOffX) * (newScale / mapScale);
+              mapOffY = cy - (cy - mapOffY) * (newScale / mapScale);
+              mapScale = newScale;
+              drawMap();
+            }
+            lastDist = dist;
+          }
+        }, { passive: false });
+
+        document.addEventListener('touchend', function(e) {
+          isDragging = false;
+          if (e.touches.length < 2) lastDist = null;
+        });
+      })();
+
+
+      // 緯度経度と、押すと地図が開くリンクの行を作る（LINE本文用）
+      function _locLinesFrom(lat, lng) {
+        if (lat === null || lng === null || lat === undefined || lng === undefined) return '';
+        const la = lat.toFixed(6);
+        const ln = lng.toFixed(6);
+        return '\n📌 ' + la + ', ' + ln +
+               '\n🗺️ https://www.google.com/maps/search/?api=1&query=' + la + ',' + ln;
+      }
+      function _locLines() { return _locLinesFrom(currentGpsLat, currentGpsLng); }
+
+      // ===== 巡回点検機能 =====
+      // ★設定：GASのURLだけをここに入れてください★
+      // （LINEのトークンとグループIDはGAS側に書く＝公開ソースに出さないため安全）
+      const PATROL_GAS_URL = 'https://script.google.com/macros/s/AKfycbzxj-uJaC_WmNSCyQJTmpZIT44PaFcLqHTK09k0nnM1N3I04wmXmKH8GP5JjIDbbn0i/exec';
+
+      let patrolUser = '';
+      let patrolClockTimer = null;
+
+      function openPatrol() {
+        const modal = document.getElementById('patrol-modal');
+        modal.style.display = 'flex';
+        modal.style.flexDirection = 'column';
+        // KPを反映
+        document.getElementById('patrol-kp').textContent = latestKiloPost || '---';
+        // 名前が既に選ばれていればそのまま事象画面へ
+        if (patrolUser) {
+          showPatrolEvents();
+        } else {
+          document.getElementById('patrol-name-layer').style.display = 'flex';
+          document.getElementById('patrol-event-layer').style.display = 'none';
+        }
+        patrolStartClock();
+      }
+
+      function closePatrol() {
+        document.getElementById('patrol-modal').style.display = 'none';
+        if (patrolClockTimer) clearInterval(patrolClockTimer);
+      }
+
+      function patrolSelectUser(name) {
+        patrolUser = name;
+        document.getElementById('patrol-user-display').textContent = name;
+        showPatrolEvents();
+      }
+
+      function patrolChangeUser() {
+        document.getElementById('patrol-name-layer').style.display = 'flex';
+        document.getElementById('patrol-event-layer').style.display = 'none';
+      }
+
+      function showPatrolEvents() {
+        document.getElementById('patrol-user-display').textContent = patrolUser;
+        document.getElementById('patrol-name-layer').style.display = 'none';
+        document.getElementById('patrol-event-layer').style.display = 'flex';
+        // KPを最新に更新
+        document.getElementById('patrol-kp').textContent = latestKiloPost || '---';
+      }
+
+      function patrolStartClock() {
+        if (patrolClockTimer) clearInterval(patrolClockTimer);
+        function tick() {
+          const now = new Date();
+          const h = String(now.getHours()).padStart(2,'0');
+          const m = String(now.getMinutes()).padStart(2,'0');
+          document.getElementById('patrol-time').textContent = h + ':' + m;
+          // 距離標もリアルタイム更新（移動に追従）
+          const kpEl = document.getElementById('patrol-kp');
+          if (kpEl) kpEl.textContent = latestKiloPost || '---';
+        }
+        tick();
+        patrolClockTimer = setInterval(tick, 1000);
+      }
+
+      async function patrolSend(eventName) {
+        const kp   = latestKiloPost || '不明';
+        const now  = new Date();
+        const date = now.getFullYear() + '/' +
+          String(now.getMonth()+1).padStart(2,'0') + '/' +
+          String(now.getDate()).padStart(2,'0');
+        const time = String(now.getHours()).padStart(2,'0') + ':' +
+          String(now.getMinutes()).padStart(2,'0');
+
+        const msg = `📍 ${kp}\n⚠️ ${eventName}\n🕐 ${date} ${time}\n👤 ${patrolUser}` + _locLines();
+
+        patrolToast('📡 送信中...', '');
+        try {
+          await fetch(PATROL_GAS_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'line',
+              message: msg,
+              kp, event: eventName, date, time, user: patrolUser
+            })
+          });
+          patrolToast('✅ 送信しました', 'ok');
+        } catch(e) {
+          patrolToast('❌ 送信エラー', 'err');
+        }
+      }
+
+      function patrolToast(msg, type) {
+        const t = document.getElementById('patrol-toast');
+        t.textContent = msg;
+        t.className = type;
+        t.style.display = 'block';
+        clearTimeout(t._tm);
+        t._tm = setTimeout(() => { t.style.display = 'none'; }, 2500);
+      }
+
+      function closeCamera() {
+        _stopCamKpTimer();
+        _resetKpLock();
+        cameraMode = 'normal';
+        const sendBtn = document.getElementById('btn-patrol-send');
+        if (sendBtn) sendBtn.style.display = 'none';
+        // 落下物モードの後片付け
+        const fallEls = ['btn-fall-next', 'fall-step-badge', 'fall-thumbs', 'fall-review'];
+        fallEls.forEach(function(id) {
+          const el = document.getElementById(id);
+          if (el) el.style.display = 'none';
+        });
+        _fallClearShots();
+        _stopCameraStream();
+        lightMode = 'off';
+        torchOn = false;
+        _updateTorchButton();
+        cameraLens = null;
+        cameraWideOk = false;
+        capturedBlob = null;
+        capturedKP = null;
+        capturedLat = null;
+        capturedLng = null;
+        const stp = document.getElementById('shakan-test-panel');
+        if (stp) stp.style.display = 'none';
+        const modal = document.getElementById('camera-modal');
+        modal.style.display = 'none';
+        document.body.appendChild(modal);
+      }
+
+      // Blob → base64（data URLの本体部分のみ）
+      function _blobToBase64(blob) {
+        return new Promise(function(resolve, reject) {
+          const r = new FileReader();
+          r.onload = function() { resolve(String(r.result).split(',')[1]); };
+          r.onerror = reject;
+          r.readAsDataURL(blob);
+        });
+      }
+
+      // 「その他異常」：撮影した写真＋距離標等をGAS経由でLINE送信
+      async function patrolSendPhoto() {
+        if (!capturedBlob) return;
+        const kp   = capturedKP || _currentKP() || '不明';   // 写真に焼き込んだ距離標
+        const shotLat = (capturedLat !== null) ? capturedLat : currentGpsLat;
+        const shotLng = (capturedLng !== null) ? capturedLng : currentGpsLng;
+        const now  = new Date();
+        const date = now.getFullYear() + '/' +
+          String(now.getMonth()+1).padStart(2,'0') + '/' +
+          String(now.getDate()).padStart(2,'0');
+        const time = String(now.getHours()).padStart(2,'0') + ':' +
+          String(now.getMinutes()).padStart(2,'0');
+        const user = patrolUser || '';
+
+        let base64;
+        try {
+          base64 = await _blobToBase64(capturedBlob);
+        } catch(e) {
+          patrolToast('❌ 画像変換エラー', 'err');
+          return;
+        }
+
+        closeCamera();                 // カメラを閉じて巡回画面へ戻す（トーストを見せるため）
+        patrolToast('📡 送信中...', '');
+
+        const msg = `📍 ${kp}\n⚠️ その他異常\n🕐 ${date} ${time}\n👤 ${user}` + _locLinesFrom(shotLat, shotLng);
+        try {
+          await fetch(PATROL_GAS_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'line_image',
+              message: msg,
+              kp, event: 'その他異常', date, time, user,
+              image: base64, mimeType: 'image/jpeg'
+            })
+          });
+          patrolToast('✅ 送信しました', 'ok');
+        } catch(e) {
+          patrolToast('❌ 送信エラー', 'err');
+        }
+      }
+
+      // 画像ファイル（保存されるJPEGそのもの）のSHA-256を求める
+      // ※ 焼き込みや圧縮のあとの最終データを対象にしないと改ざん検出に使えません
+      async function _sha256Hex(blob) {
+        try {
+          if (!(window.crypto && crypto.subtle)) return null;   // 非HTTPSなど
+          const buf  = await blob.arrayBuffer();
+          const hash = await crypto.subtle.digest('SHA-256', buf);
+          return Array.from(new Uint8Array(hash))
+            .map(function(b) { return b.toString(16).padStart(2, '0'); })
+            .join('');
+        } catch (e) { return null; }
+      }
+
+      // ===== 写管屋テスト用：最小Exif =====
+      function _minimalExifApp1(info) {
+        const put16 = (a,v)=>a.push((v>>8)&255,v&255);
+        const put32 = (a,v)=>a.push((v>>>24)&255,(v>>>16)&255,(v>>>8)&255,v&255);
+        const ascii = (str)=>{ const a=[]; for (let i=0;i<str.length;i++) a.push(str.charCodeAt(i)&0x7f); a.push(0); return a; };
+        const rat = (pairs)=>{ const a=[]; pairs.forEach(q=>{put32(a,q[0]);put32(a,q[1]);}); return a; };
+        const dms = (deg)=>{ const d=Math.floor(deg), mf=(deg-d)*60, m=Math.floor(mf), ss=Math.round((mf-m)*60*10000); return [[d,1],[m,1],[ss,10000]]; };
+        const E = {
+          ascii:(tag,str)=>({tag,type:2,count:ascii(str).length,bytes:ascii(str)}),
+          short:(tag,v)=>{const b=[];put16(b,v);return {tag,type:3,count:1,bytes:b};},
+          long:(tag,v)=>{const b=[];put32(b,v);return {tag,type:4,count:1,bytes:b};},
+          byte:(tag,b)=>({tag,type:1,count:b.length,bytes:b}),
+          rat:(tag,p)=>({tag,type:5,count:p.length,bytes:rat(p)})
+        };
+        const build=(entries,start)=>{
+          entries=entries.slice().sort((a,b)=>a.tag-b.tag);
+          const h=[], d=[]; const ds=start+2+entries.length*12+4; put16(h,entries.length);
+          entries.forEach(e=>{ put16(h,e.tag); put16(h,e.type); put32(h,e.count); if(e.bytes.length<=4){const b=e.bytes.slice();while(b.length<4)b.push(0);h.push(...b);}else{put32(h,ds+d.length);d.push(...e.bytes);if(d.length%2)d.push(0);} });
+          put32(h,0); return h.concat(d);
+        };
+        const dt=info.date||new Date();
+        const pad=n=>String(n).padStart(2,'0');
+        const dtStr=`${dt.getFullYear()}:${pad(dt.getMonth()+1)}:${pad(dt.getDate())} ${pad(dt.getHours())}:${pad(dt.getMinutes())}:${pad(dt.getSeconds())}`;
+        const hasGps=Number.isFinite(info.lat)&&Number.isFinite(info.lng);
+        const exif=[E.ascii(0x9003,dtStr),E.ascii(0x9004,dtStr),E.long(0xA002,info.width||0),E.long(0xA003,info.height||0)];
+        const gps=hasGps?[E.byte(0x0000,[2,3,0,0]),E.ascii(0x0001,info.lat>=0?'N':'S'),E.rat(0x0002,dms(Math.abs(info.lat))),E.ascii(0x0003,info.lng>=0?'E':'W'),E.rat(0x0004,dms(Math.abs(info.lng)))]:[];
+        const ifd0=(ep,gp)=>{ const a=[E.short(0x0112,1),E.ascii(0x0132,dtStr),E.long(0x8769,ep)]; if(hasGps)a.push(E.long(0x8825,gp)); return a; };
+        const ifd0Len=build(ifd0(0,0),8).length;
+        const exifStart=8+ifd0Len, exifIfd=build(exif,exifStart);
+        const gpsStart=exifStart+exifIfd.length, gpsIfd=hasGps?build(gps,gpsStart):[];
+        const root=build(ifd0(exifStart,gpsStart),8);
+        const tiff=[0x4D,0x4D,0x00,0x2A,0,0,0,8].concat(root,exifIfd,gpsIfd);
+        const payload=[0x45,0x78,0x69,0x66,0,0].concat(tiff), seg=[0xFF,0xE1]; put16(seg,payload.length+2);
+        return new Uint8Array(seg.concat(payload));
+      }
+
+      // APP0/JFIFがあれば、その直後へExifを入れる。なければSOI直後。
+      async function _jpegWithMinimalExif(blob, info) {
+        const src=new Uint8Array(await blob.arrayBuffer());
+        if(src[0]!==0xFF||src[1]!==0xD8) return blob;
+        const app1=_minimalExifApp1(info);
+        let pos=2;
+        if(src.length>6 && src[2]===0xFF && src[3]===0xE0){
+          const len=(src[4]<<8)|src[5];
+          if(len>=2 && 2+2+len<=src.length) pos=2+2+len;
+        }
+        const out=new Uint8Array(src.length+app1.length);
+        out.set(src.subarray(0,pos),0); out.set(app1,pos); out.set(src.subarray(pos),pos+app1.length);
+        return new Blob([out],{type:'image/jpeg'});
+      }
+
+      function _canvasBlob(canvas) {
+        return new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('JPEG生成失敗')),'image/jpeg',0.92));
+      }
+
+      async function captureShakanFourPatterns(video, previewCanvas) {
+        const OUT_W=1280, OUT_H=960;
+        const vw=video.videoWidth||OUT_W, vh=video.videoHeight||OUT_H;
+        const cropW=vw, cropH=vw*(OUT_H/OUT_W), cropX=0, cropY=Math.max(0,(vh-cropH)/2);
+        const clean=document.createElement('canvas'); clean.width=OUT_W; clean.height=OUT_H;
+        const cc=clean.getContext('2d');
+        const flashed=await _flashBefore();
+        cc.drawImage(video,cropX,cropY,cropW,cropH,0,0,OUT_W,OUT_H);
+        if(flashed)_flashAfter();
+
+        const over=document.createElement('canvas'); over.width=OUT_W; over.height=OUT_H;
+        const oc=over.getContext('2d'); oc.drawImage(clean,0,0);
+        const overlayText=_getOverlayText();
+        let fs=22; const FONT=px=>`bold ${px}px "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif`;
+        oc.font=FONT(fs); const maxW=OUT_W-28, mw=oc.measureText(overlayText).width; if(mw>maxW)fs=Math.max(11,Math.floor(fs*maxW/mw));
+        const bh=fs+16, by=OUT_H-bh; oc.fillStyle='rgba(0,0,0,0.82)'; oc.fillRect(0,by,OUT_W,bh); oc.fillStyle='#fff'; oc.font=FONT(fs); oc.textAlign='left'; oc.textBaseline='middle'; oc.fillText(overlayText,14,by+bh/2);
+
+        const date=new Date(), lat=currentGpsLat, lng=currentGpsLng;
+        const a=await _canvasBlob(clean);
+        const b=await _canvasBlob(over);
+        const c=await _jpegWithMinimalExif(a,{date,lat,lng,width:OUT_W,height:OUT_H});
+        const d=await _jpegWithMinimalExif(b,{date,lat,lng,width:OUT_W,height:OUT_H});
+        const kp=_currentKP()||'不明';
+        const stamp=`${date.getFullYear()}${String(date.getMonth()+1).padStart(2,'0')}${String(date.getDate()).padStart(2,'0')}_${String(date.getHours()).padStart(2,'0')}${String(date.getMinutes()).padStart(2,'0')}${String(date.getSeconds()).padStart(2,'0')}`;
+        const items=[
+          {code:'A',name:`TEST_A_NOEXIF_NOOVERLAY_${stamp}.jpg`,blob:a,label:'Exifなし・焼き込みなし'},
+          {code:'B',name:`TEST_B_NOEXIF_OVERLAY_${stamp}.jpg`,blob:b,label:'Exifなし・焼き込みあり'},
+          {code:'C',name:`TEST_C_MINEXIF_NOOVERLAY_${stamp}.jpg`,blob:c,label:'最小Exif・焼き込みなし'},
+          {code:'D',name:`TEST_D_MINEXIF_OVERLAY_${stamp}.jpg`,blob:d,label:'最小Exif・焼き込みあり'}
+        ];
+        const st=document.getElementById('shakan-test-status');
+        if(st)st.textContent='A～D生成済み。Google Driveへ送信中...';
+        document.getElementById('btn-capture').style.display='none';
+        document.getElementById('btn-lock').style.display='none';
+        document.getElementById('btn-torch').style.display='none';
+        document.getElementById('light-label').style.display='none';
+        previewCanvas.width=OUT_W; previewCanvas.height=OUT_H; previewCanvas.getContext('2d').drawImage(over,0,0);
+        video.style.display='none'; previewCanvas.style.display='block'; document.getElementById('crop-guide').style.display='none'; document.getElementById('camera-kp-overlay').style.display='none';
+        const shakanTestId = 'ST' + Date.now();
+        try {
+          for(const it of items){
+            const base64=await _blobToBase64(it.blob); const sha=await _sha256Hex(it.blob);
+            await fetch(PATROL_GAS_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'shakan_test',testId:shakanTestId,pattern:it.code,label:it.label,fileName:it.name,kp,lat,lng,sha256:sha||'',image:base64,mimeType:'image/jpeg'})});
+          }
+          if(st)st.innerHTML='✅ 4枚をアップロードしました。<br>A→B→C→Dの順で写管屋に取り込み、判定を記録してください。';
+        } catch(e){ if(st)st.textContent='❌ アップロード失敗: '+e.message; }
+      }
+
+      // ===== Exif（撮影日時・GPS・距離標）の書き込み =====
+      // canvasで作ったJPEGにはExifが入らないため、APP1セグメントを自前で組んで差し込む
+      const EXIF_MAKE     = 'R191kyori';
+      const EXIF_MODEL    = 'PWA Camera';
+      const EXIF_SOFTWARE = 'R191kyori PWA ver3.75';
+      const STAGE_EN = { '処理前': 'before', '近景': 'closeup', '処理後': 'after' };
+
+      function _exifDateStr(d, utc) {
+        const p = (n) => String(n).padStart(2, '0');
+        return (utc
+          ? [d.getUTCFullYear(), p(d.getUTCMonth() + 1), p(d.getUTCDate())]
+          : [d.getFullYear(),    p(d.getMonth() + 1),    p(d.getDate())]).join(':')
+          + ' ' +
+          (utc
+          ? [p(d.getUTCHours()), p(d.getUTCMinutes()), p(d.getUTCSeconds())]
+          : [p(d.getHours()),    p(d.getMinutes()),    p(d.getSeconds())]).join(':');
+      }
+
+      // Exifの APP1 セグメント（FFE1〜）を作る
+      function _exifApp1(info) {
+        const put16 = (a, v) => { a.push((v >> 8) & 0xff, v & 0xff); };
+        const put32 = (a, v) => { a.push((v >>> 24) & 0xff, (v >>> 16) & 0xff, (v >>> 8) & 0xff, v & 0xff); };
+        const ascii = (str) => {
+          const a = [];
+          for (let i = 0; i < str.length; i++) {
+            const c = str.charCodeAt(i);
+            a.push(c < 128 ? c : 63);   // ASCII以外は '?' に置き換え（規格上ASCIIのみ）
+          }
+          a.push(0);
+          return a;
+        };
+        const utf16be = (str) => {
+          const a = [];
+          for (let i = 0; i < str.length; i++) { const c = str.charCodeAt(i); a.push((c >> 8) & 0xff, c & 0xff); }
+          return a;
+        };
+        const rational = (pairs) => { const a = []; pairs.forEach(function(q) { put32(a, q[0]); put32(a, q[1]); }); return a; };
+        const dmsPairs = (deg) => {
+          const d  = Math.floor(deg);
+          const mf = (deg - d) * 60;
+          const m  = Math.floor(mf);
+          const sc = Math.round((mf - m) * 60 * 10000);
+          return [[d, 1], [m, 1], [sc, 10000]];
+        };
+
+        const eASCII = (tag, str) => { const b = ascii(str); return { tag: tag, type: 2, count: b.length, bytes: b }; };
+        const eSHORT = (tag, v) => { const b = []; put16(b, v); return { tag: tag, type: 3, count: 1, bytes: b }; };
+        const eLONG  = (tag, v) => { const b = []; put32(b, v); return { tag: tag, type: 4, count: 1, bytes: b }; };
+        const eBYTE  = (tag, b) => ({ tag: tag, type: 1, count: b.length, bytes: b });
+        const eUNDEF = (tag, b) => ({ tag: tag, type: 7, count: b.length, bytes: b });
+        const eRAT   = (tag, pairs) => ({ tag: tag, type: 5, count: pairs.length, bytes: rational(pairs) });
+
+        // IFDを1つ組み立てる（ifdStart は TIFFヘッダ先頭からの位置）
+        const buildIfd = (entries, ifdStart) => {
+          const head = [], data = [];
+          const dataStart = ifdStart + 2 + entries.length * 12 + 4;
+          put16(head, entries.length);
+          entries.forEach(function(e) {
+            put16(head, e.tag);
+            put16(head, e.type);
+            put32(head, e.count);
+            if (e.bytes.length <= 4) {
+              const b = e.bytes.slice();
+              while (b.length < 4) b.push(0);
+              for (let i = 0; i < 4; i++) head.push(b[i]);
+            } else {
+              put32(head, dataStart + data.length);
+              for (let i = 0; i < e.bytes.length; i++) data.push(e.bytes[i]);
+              if (data.length % 2) data.push(0);   // 2バイト境界にそろえる
+            }
+          });
+          put32(head, 0);   // 次のIFDなし
+          return head.concat(data);
+        };
+
+        const dt     = info.date || new Date();
+        const dtStr  = _exifDateStr(dt, false);
+        const hasGps = (typeof info.lat === 'number' && typeof info.lng === 'number' &&
+                        isFinite(info.lat) && isFinite(info.lng));
+
+        // --- Exif IFD（タグ番号の昇順に並べる） ---
+        const exifEntries = [
+          eUNDEF(0x9000, [0x30, 0x32, 0x33, 0x30]),   // ExifVersion 0230
+          eASCII(0x9003, dtStr),                       // DateTimeOriginal（撮影日時）
+          eASCII(0x9004, dtStr),                       // DateTimeDigitized
+          eUNDEF(0x9101, [1, 2, 3, 0]),                // ComponentsConfiguration YCbCr
+          eUNDEF(0x9286, [0x55, 0x4E, 0x49, 0x43, 0x4F, 0x44, 0x45, 0x00]
+                          .concat(utf16be(info.comment || ''))),   // UserComment(UNICODE)
+          eUNDEF(0xA000, [0x30, 0x31, 0x30, 0x30]),   // FlashpixVersion 0100
+          eSHORT(0xA001, 1),                           // ColorSpace = sRGB
+          eLONG(0xA002, info.width  || 0),             // PixelXDimension
+          eLONG(0xA003, info.height || 0)              // PixelYDimension
+        ];
+
+        // --- GPS IFD ---
+        const gpsEntries = hasGps ? [
+          eBYTE(0x0000, [2, 3, 0, 0]),                                     // GPSVersionID
+          eASCII(0x0001, info.lat >= 0 ? 'N' : 'S'),
+          eRAT(0x0002, dmsPairs(Math.abs(info.lat))),
+          eASCII(0x0003, info.lng >= 0 ? 'E' : 'W'),
+          eRAT(0x0004, dmsPairs(Math.abs(info.lng))),
+          eRAT(0x0007, [[dt.getUTCHours(), 1], [dt.getUTCMinutes(), 1], [dt.getUTCSeconds(), 1]]),
+          eASCII(0x001D, _exifDateStr(dt, true).split(' ')[0])             // GPSDateStamp(UTC)
+        ] : [];
+
+        // --- IFD0（ExifとGPSの位置を指すので、長さを先に確定してから組み直す） ---
+        const ifd0Entries = (exifPtr, gpsPtr) => {
+          const list = [
+            eASCII(0x010E, info.description || ''),   // ImageDescription
+            eASCII(0x010F, EXIF_MAKE),
+            eASCII(0x0110, EXIF_MODEL),
+            eSHORT(0x0112, 1),                        // Orientation = 通常
+            eRAT(0x011A, [[72, 1]]),                  // XResolution
+            eRAT(0x011B, [[72, 1]]),                  // YResolution
+            eSHORT(0x0128, 2),                        // ResolutionUnit = inch
+            eASCII(0x0131, EXIF_SOFTWARE),
+            eASCII(0x0132, dtStr),                    // DateTime
+            eSHORT(0x0213, 1),                        // YCbCrPositioning = centered
+            eLONG(0x8769, exifPtr)                    // ExifIFDPointer
+          ];
+          if (hasGps) list.push(eLONG(0x8825, gpsPtr));   // GPSInfoIFDPointer
+          return list;
+        };
+
+        const ifd0Len   = buildIfd(ifd0Entries(0, 0), 8).length;
+        const exifStart = 8 + ifd0Len;
+        const exifIfd   = buildIfd(exifEntries, exifStart);
+        const gpsStart  = exifStart + exifIfd.length;
+        const gpsIfd    = hasGps ? buildIfd(gpsEntries, gpsStart) : [];
+        const ifd0      = buildIfd(ifd0Entries(exifStart, gpsStart), 8);
+
+        const tiff    = [0x4D, 0x4D, 0x00, 0x2A, 0, 0, 0, 8].concat(ifd0, exifIfd, gpsIfd);
+        const payload = [0x45, 0x78, 0x69, 0x66, 0, 0].concat(tiff);   // "Exif" + 00 00
+        const seg     = [0xFF, 0xE1];
+        put16(seg, payload.length + 2);
+        return new Uint8Array(seg.concat(payload));
+      }
+
+      // JPEGの先頭(SOI)の直後にExifを差し込んだBlobを返す
+      async function _jpegWithExif(blob, info) {
+        try {
+          const src = new Uint8Array(await blob.arrayBuffer());
+          if (src[0] !== 0xFF || src[1] !== 0xD8) return blob;   // JPEGでなければそのまま
+          const app1 = _exifApp1(info);
+          const out  = new Uint8Array(src.length + app1.length);
+          out.set(src.subarray(0, 2), 0);
+          out.set(app1, 2);
+          out.set(src.subarray(2), 2 + app1.length);
+          return new Blob([out], { type: 'image/jpeg' });
+        } catch (e) {
+          return blob;   // 失敗しても写真は失わない
+        }
+      }
+
+      // ===== 落下物：処理前 → 近景 → 処理後 の3枚撮影＆クラウドアップロード =====
+      const FALL_STEPS = ['処理前', '近景', '処理後'];
+      let fallShots = [null, null, null];  // {blob, url, kp, date, time}
+      let fallStep = 0;                    // 現在の撮影工程 0..2
+      let fallRetakeIndex = null;          // 確認画面から撮り直し中のインデックス
+      let fallGroupId = '';                // 3枚を紐づけるID
+      let fallUploading = false;
+
+      function fallToast(msg, type) {
+        const t = document.getElementById('fall-toast');
+        if (!t) return;
+        t.textContent = msg;
+        t.className = type || '';
+        t.style.display = 'block';
+        clearTimeout(t._tm);
+        if (type) t._tm = setTimeout(function() { t.style.display = 'none'; }, 2500);
+      }
+
+      function _fallClearShots() {
+        fallShots.forEach(function(s) { if (s && s.url) URL.revokeObjectURL(s.url); });
+        fallShots = [null, null, null];
+        fallStep = 0;
+        fallRetakeIndex = null;
+        fallUploading = false;
+        const th = document.getElementById('fall-thumbs');
+        if (th) th.innerHTML = '';
+        const rl = document.getElementById('fall-review-list');
+        if (rl) rl.innerHTML = '';
+      }
+
+      function _fallUpdateBadge() {
+        const title = document.getElementById('fall-step-title');
+        const count = document.getElementById('fall-step-count');
+        if (!title || !count) return;
+        const lensName = (FALL_LENS[fallStep] === 'wide' && cameraWideOk) ? '広角' : '標準';
+        title.textContent = '落下物：' + FALL_STEPS[fallStep] + '（' + lensName + '）';
+        count.textContent = (fallRetakeIndex !== null)
+          ? '撮り直し中'
+          : (fallStep + 1) + ' / ' + FALL_STEPS.length + ' 枚目';
+      }
+
+      function _fallUpdateThumbs() {
+        const box = document.getElementById('fall-thumbs');
+        if (!box) return;
+        box.innerHTML = '';
+        fallShots.forEach(function(s) {
+          if (!s) return;
+          const img = document.createElement('img');
+          img.src = s.url;
+          box.appendChild(img);
+        });
+      }
+
+      // 「次へ」／「確認へ」／「確定」
+      function fallNextStep() {
+        if (!capturedBlob) { fallToast('画像がありません', 'err'); return; }
+
+        const idx = (fallRetakeIndex !== null) ? fallRetakeIndex : fallStep;
+        if (fallShots[idx] && fallShots[idx].url) URL.revokeObjectURL(fallShots[idx].url);
+
+        const now = new Date();
+        fallShots[idx] = {
+          blob: capturedBlob,
+          url : URL.createObjectURL(capturedBlob),
+          kp  : capturedKP || _currentKP() || '不明',
+          lat : (capturedLat !== null) ? capturedLat : currentGpsLat,
+          lng : (capturedLng !== null) ? capturedLng : currentGpsLng,
+          date: now.getFullYear() + '/' + String(now.getMonth()+1).padStart(2,'0') + '/' + String(now.getDate()).padStart(2,'0'),
+          time: String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0')
+        };
+        capturedBlob = null;
+        capturedKP = null;
+        capturedLat = null;
+        capturedLng = null;
+
+        // この1枚のSHA-256を計算（表示と送信に使う）
+        (function(shot) {
+          _sha256Hex(shot.blob).then(function(hex) {
+            shot.sha256 = hex;
+            const el = document.getElementById('fall-sha-' + idx);
+            if (el) el.textContent = 'SHA-256: ' + (hex || '計算できません');
+          });
+        })(fallShots[idx]);
+
+        if (fallRetakeIndex !== null) {   // 撮り直し完了 → 確認画面へ戻る
+          fallRetakeIndex = null;
+          _fallShowReview();
+          return;
+        }
+
+        if (fallStep < FALL_STEPS.length - 1) {
+          fallStep++;
+          _fallUpdateBadge();
+          _fallUpdateThumbs();
+          retakePhoto();                  // ライブプレビューに戻す
+          fallToast('次は「' + FALL_STEPS[fallStep] + '」を撮影');
+          setTimeout(function() {
+            const t = document.getElementById('fall-toast');
+            if (t) t.style.display = 'none';
+          }, 2000);
+        } else {
+          _fallShowReview();
+        }
+      }
+
+      function _fallShowReview() {
+        _stopCamKpTimer();
+        const rev  = document.getElementById('fall-review');
+        const list = document.getElementById('fall-review-list');
+        document.getElementById('fall-review-kp').textContent =
+          '距離標 ' + (fallShots[0] ? fallShots[0].kp : '---') +
+          '　' + (fallShots[0] ? fallShots[0].date + ' ' + fallShots[0].time : '');
+        list.innerHTML = '';
+        fallShots.forEach(function(s, i) {
+          if (!s) return;
+          const wrap = document.createElement('div');
+          wrap.className = 'fall-review-item';
+          const cap = document.createElement('div');
+          cap.className = 'cap';
+          cap.textContent = (i + 1) + '. ' + FALL_STEPS[i];
+          const img = document.createElement('img');
+          img.src = s.url;
+          const sha = document.createElement('div');
+          sha.className = 'sha';
+          sha.id = 'fall-sha-' + i;
+          sha.textContent = 'SHA-256: ' + (s.sha256 || '計算中...');
+          const btn = document.createElement('button');
+          btn.textContent = '撮り直し';
+          btn.onclick = function() { fallRetake(i); };
+          wrap.appendChild(cap); wrap.appendChild(img); wrap.appendChild(sha); wrap.appendChild(btn);
+          list.appendChild(wrap);
+        });
+        document.getElementById('btn-fall-upload').disabled = false;
+        document.getElementById('btn-fall-upload').textContent = '☁️ アップロード';
+        rev.style.display = 'flex';
+      }
+
+      function fallRetake(i) {
+        fallRetakeIndex = i;
+        fallStep = i;                     // 焼き込む工程名を合わせる
+        document.getElementById('fall-review').style.display = 'none';
+        _fallUpdateBadge();
+        retakePhoto();
+      }
+
+      function fallCancel() {
+        if (fallUploading) return;
+        if (!confirm('3枚とも破棄してやり直しますか？')) return;
+        _fallClearShots();
+        document.getElementById('fall-review').style.display = 'none';
+        fallGroupId = 'FO' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+        _fallUpdateBadge();
+        _fallUpdateThumbs();
+        retakePhoto();
+      }
+
+      // 3枚をGAS経由でGoogle Driveへアップロード（1枚ずつ順番に送信）
+      async function fallUpload() {
+        if (fallUploading) return;
+        if (fallShots.some(function(s) { return !s; })) {
+          fallToast('❌ 3枚そろっていません', 'err');
+          return;
+        }
+        fallUploading = true;
+        const btn = document.getElementById('btn-fall-upload');
+        btn.disabled = true;
+
+        const kp     = fallShots[0].kp;
+        const date   = fallShots[0].date;
+        const time   = fallShots[0].time;
+        const stamp  = date.replace(/\//g, '') + '_' + time.replace(':', '');
+        const safeKP = _kpFileName(kp);
+        const user   = patrolUser || '';
+
+        try {
+          for (let i = 0; i < fallShots.length; i++) {
+            btn.textContent = '📡 送信中... ' + (i + 1) + '/' + fallShots.length;
+            fallToast('📡 送信中... ' + (i + 1) + '/' + fallShots.length);
+            const base64 = await _blobToBase64(fallShots[i].blob);
+            if (!fallShots[i].sha256) {   // 未計算なら送信前に確定させる
+              fallShots[i].sha256 = await _sha256Hex(fallShots[i].blob);
+            }
+            await fetch(PATROL_GAS_URL, {
+              method: 'POST',
+              mode: 'no-cors',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                type: 'fallen_object',
+                groupId: fallGroupId,
+                index: i + 1,
+                total: fallShots.length,
+                stage: FALL_STEPS[i],
+                fileName: 'R191_' + safeKP + '_' + stamp + '_' + (i + 1) + '_' + FALL_STEPS[i] + '.jpg',
+                kp: kp, date: date, time: time, user: user,
+                event: '落下物',
+                message: '📍 ' + kp + '\n🧱 落下物（' + FALL_STEPS[i] + ' ' + (i + 1) + '/' + fallShots.length + '）\n🕐 ' + date + ' ' + time + (user ? '\n👤 ' + user : '') + _locLinesFrom(fallShots[0].lat, fallShots[0].lng),
+                sha256: fallShots[i].sha256 || '',
+                image: base64,
+                mimeType: 'image/jpeg'
+              })
+            });
+          }
+          fallToast('✅ 3枚アップロードしました', 'ok');
+          setTimeout(closeCamera, 1600);
+        } catch (e) {
+          fallUploading = false;
+          btn.disabled = false;
+          btn.textContent = '☁️ 再アップロード';
+          fallToast('❌ 送信エラー（電波を確認して再試行）', 'err');
+        }
+      }
+    </script>
+  </body>
+</html>

@@ -43,6 +43,7 @@ self.addEventListener('fetch', (e) => {
   }
 
   // ページ本体(HTML)はネットワーク優先 ＝ オンライン時は常に最新を表示。
+  // キャッシュはページごと(URLごと)に持つので、テスト用ページを開いても本体のオフライン版は残る。
   // 取得できたら最新をキャッシュし、オフライン時はキャッシュを使う。
   const isHTML = req.mode === 'navigate' ||
                  (req.headers.get('accept') || '').includes('text/html');
@@ -51,9 +52,9 @@ self.addEventListener('fetch', (e) => {
     e.respondWith(
       fetch(req).then((res) => {
         const copy = res.clone();
-        caches.open(CACHE_NAME).then((c) => c.put('index.html', copy));
+        caches.open(CACHE_NAME).then((c) => c.put(req, copy));
         return res;
-      }).catch(() => caches.match('index.html'))
+      }).catch(() => caches.match(req).then((c) => c || caches.match('index.html')))
     );
     return;
   }
