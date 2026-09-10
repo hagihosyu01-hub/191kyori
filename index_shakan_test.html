@@ -1044,8 +1044,8 @@
 
       <!-- 写管屋4パターン比較テスト：生成・アップロード状況 -->
       <div id="shakan-test-panel" style="display:none;position:absolute;left:4%;right:4%;bottom:22px;z-index:30;background:rgba(0,0,0,.88);color:#fff;padding:14px;border-radius:12px;text-align:left;font-size:13px;line-height:1.5;">
-        <div style="font-weight:bold;font-size:15px;margin-bottom:6px;">写管屋4パターン比較テスト</div>
-        <div id="shakan-test-status">撮影するとA～Dを同時生成します。V2は既存Exifを除去し、Exifを1個だけAPP0/JFIFの後ろに入れます。</div>
+        <div style="font-weight:bold;font-size:15px;margin-bottom:6px;">写管屋4パターン比較テスト E4</div>
+        <div id="shakan-test-status">撮影するとA～Dを同時生成します。E4はSiteBox正常写真の基本Exif構成に寄せ、GPS・UserComment・Make/Model/Softwareは入れません。</div>
       </div>
 
       <div id="fall-toast"></div>
@@ -1235,7 +1235,7 @@
         const PIN_SVG = '<svg class="pin-ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="#e53935" d="M12 2c-3.9 0-7 3.1-7 7 0 5.2 7 13 7 13s7-7.8 7-13c0-3.9-3.1-7-7-7z"/><circle cx="12" cy="9" r="2.6" fill="#fff"/></svg>';
         cameraButtonHtml = '<button onclick="openCamera()" class="btn-camera">📷 カメラを起動 📷</button>';
         fallButtonHtml = '<button onclick="openFallCamera()" class="btn-camera-fall">📷 落下物を撮影 📷</button>';
-        shakanTestButtonHtml = '<button onclick="openShakanTestCamera()" class="btn-shakan-test">🧪 写管屋 4パターンテスト V2</button>';
+        shakanTestButtonHtml = '<button onclick="openShakanTestCamera()" class="btn-shakan-test">🧪 写管屋 4パターンテスト E4</button>';
         patrolButtonHtml = '<button onclick="openPatrol()" class="btn-patrol">' + CAR_SVG + ' 道路点検 ' + CAR_SVG + '</button>';
         if (res.status !== "圏外です") {
           mapButtonHtml = '<button onclick="openMapModal()" class="btn-map">' + PIN_SVG + ' 現在位置を表示 ' + PIN_SVG + '</button>';
@@ -2400,39 +2400,81 @@
         } catch (e) { return null; }
       }
 
-      // ===== 写管屋テスト用：最小Exif =====
-      function _minimalExifApp1(info) {
-        const put16 = (a,v)=>a.push((v>>8)&255,v&255);
-        const put32 = (a,v)=>a.push((v>>>24)&255,(v>>>16)&255,(v>>>8)&255,v&255);
+      // ===== 写管屋テスト用 E4：SiteBox正常写真に寄せた基本Exif（出自情報は偽装しない） =====
+      function _e4ExifApp1(info) {
+        // JPEGセグメント長はBig Endian、Exif/TIFF本体はSiteBox正常写真に合わせてLittle Endian(II)
+        const put16be = (a,v)=>a.push((v>>8)&255,v&255);
+        const put16le = (a,v)=>a.push(v&255,(v>>8)&255);
+        const put32le = (a,v)=>a.push(v&255,(v>>>8)&255,(v>>>16)&255,(v>>>24)&255);
         const ascii = (str)=>{ const a=[]; for (let i=0;i<str.length;i++) a.push(str.charCodeAt(i)&0x7f); a.push(0); return a; };
-        const rat = (pairs)=>{ const a=[]; pairs.forEach(q=>{put32(a,q[0]);put32(a,q[1]);}); return a; };
-        const dms = (deg)=>{ const d=Math.floor(deg), mf=(deg-d)*60, m=Math.floor(mf), ss=Math.round((mf-m)*60*10000); return [[d,1],[m,1],[ss,10000]]; };
+        const rat = (pairs)=>{ const a=[]; pairs.forEach(q=>{put32le(a,q[0]);put32le(a,q[1]);}); return a; };
         const E = {
-          ascii:(tag,str)=>({tag,type:2,count:ascii(str).length,bytes:ascii(str)}),
-          short:(tag,v)=>{const b=[];put16(b,v);return {tag,type:3,count:1,bytes:b};},
-          long:(tag,v)=>{const b=[];put32(b,v);return {tag,type:4,count:1,bytes:b};},
-          byte:(tag,b)=>({tag,type:1,count:b.length,bytes:b}),
+          ascii:(tag,str)=>{const b=ascii(str);return {tag,type:2,count:b.length,bytes:b};},
+          short:(tag,v)=>{const b=[];put16le(b,v);return {tag,type:3,count:1,bytes:b};},
+          long:(tag,v)=>{const b=[];put32le(b,v);return {tag,type:4,count:1,bytes:b};},
+          undef:(tag,b)=>({tag,type:7,count:b.length,bytes:b.slice()}),
           rat:(tag,p)=>({tag,type:5,count:p.length,bytes:rat(p)})
         };
         const build=(entries,start)=>{
           entries=entries.slice().sort((a,b)=>a.tag-b.tag);
-          const h=[], d=[]; const ds=start+2+entries.length*12+4; put16(h,entries.length);
-          entries.forEach(e=>{ put16(h,e.tag); put16(h,e.type); put32(h,e.count); if(e.bytes.length<=4){const b=e.bytes.slice();while(b.length<4)b.push(0);h.push(...b);}else{put32(h,ds+d.length);d.push(...e.bytes);if(d.length%2)d.push(0);} });
-          put32(h,0); return h.concat(d);
+          const h=[], d=[];
+          const ds=start+2+entries.length*12+4;
+          put16le(h,entries.length);
+          entries.forEach(e=>{
+            put16le(h,e.tag); put16le(h,e.type); put32le(h,e.count);
+            if(e.bytes.length<=4){
+              const b=e.bytes.slice(); while(b.length<4)b.push(0); h.push(...b);
+            }else{
+              put32le(h,ds+d.length); d.push(...e.bytes);
+              if(d.length%2)d.push(0);
+            }
+          });
+          put32le(h,0);
+          return h.concat(d);
         };
+
         const dt=info.date||new Date();
         const pad=n=>String(n).padStart(2,'0');
         const dtStr=`${dt.getFullYear()}:${pad(dt.getMonth()+1)}:${pad(dt.getDate())} ${pad(dt.getHours())}:${pad(dt.getMinutes())}:${pad(dt.getSeconds())}`;
-        const hasGps=Number.isFinite(info.lat)&&Number.isFinite(info.lng);
-        const exif=[E.ascii(0x9003,dtStr),E.ascii(0x9004,dtStr),E.long(0xA002,info.width||0),E.long(0xA003,info.height||0)];
-        const gps=hasGps?[E.byte(0x0000,[2,3,0,0]),E.ascii(0x0001,info.lat>=0?'N':'S'),E.rat(0x0002,dms(Math.abs(info.lat))),E.ascii(0x0003,info.lng>=0?'E':'W'),E.rat(0x0004,dms(Math.abs(info.lng)))]:[];
-        const ifd0=(ep,gp)=>{ const a=[E.short(0x0112,1),E.ascii(0x0132,dtStr),E.long(0x8769,ep)]; if(hasGps)a.push(E.long(0x8825,gp)); return a; };
-        const ifd0Len=build(ifd0(0,0),8).length;
-        const exifStart=8+ifd0Len, exifIfd=build(exif,exifStart);
-        const gpsStart=exifStart+exifIfd.length, gpsIfd=hasGps?build(gps,gpsStart):[];
-        const root=build(ifd0(exifStart,gpsStart),8);
-        const tiff=[0x4D,0x4D,0x00,0x2A,0,0,0,8].concat(root,exifIfd,gpsIfd);
-        const payload=[0x45,0x78,0x69,0x66,0,0].concat(tiff), seg=[0xFF,0xE1]; put16(seg,payload.length+2);
+        const subsec=String(dt.getMilliseconds()).padStart(3,'0');
+
+        // SiteBox正常写真で確認できた基本Exif構成に寄せる。
+        // Make/Model/Softwareは実際の撮影元を偽るため入れない。GPS/UserCommentもこの段階では入れない。
+        const exif=[
+          E.undef(0x9000,[0x30,0x32,0x33,0x30]),      // ExifVersion 0230
+          E.ascii(0x9003,dtStr),                       // DateTimeOriginal
+          E.ascii(0x9004,dtStr),                       // DateTimeDigitized
+          E.undef(0x9101,[1,2,3,0]),                  // ComponentsConfiguration YCbCr
+          E.ascii(0x9290,subsec),                     // SubSecTime
+          E.ascii(0x9291,subsec),                     // SubSecTimeOriginal
+          E.ascii(0x9292,subsec),                     // SubSecTimeDigitized
+          E.undef(0xA000,[0x30,0x31,0x30,0x30]),      // FlashpixVersion 0100
+          E.short(0xA001,1),                          // ColorSpace sRGB
+          E.long(0xA002,info.width||0),               // PixelXDimension
+          E.long(0xA003,info.height||0)               // PixelYDimension
+        ];
+
+        const ifd0=(ep)=>[
+          E.ascii(0x010E,'DCP PHOTO'),                 // ImageDescription
+          E.short(0x0112,1),                          // Orientation
+          E.rat(0x011A,[[72,1]]),                     // XResolution
+          E.rat(0x011B,[[72,1]]),                     // YResolution
+          E.short(0x0128,2),                          // ResolutionUnit inch
+          E.ascii(0x0132,dtStr),                      // DateTime
+          E.short(0x0213,1),                          // YCbCrPositioning centered
+          E.long(0x8769,ep)                           // ExifIFDPointer
+        ];
+
+        const ifd0Len=build(ifd0(0),8).length;
+        const exifStart=8+ifd0Len;
+        const exifIfd=build(exif,exifStart);
+        const root=build(ifd0(exifStart),8);
+
+        // TIFF header: 'II' 2A00 + first IFD offset=8
+        const tiff=[0x49,0x49,0x2A,0x00,0x08,0x00,0x00,0x00].concat(root,exifIfd);
+        const payload=[0x45,0x78,0x69,0x66,0,0].concat(tiff);
+        const seg=[0xFF,0xE1];
+        put16be(seg,payload.length+2);
         return new Uint8Array(seg.concat(payload));
       }
 
@@ -2494,12 +2536,12 @@
 
       // 既存Exifを除去したうえで、APP0/JFIFの直後にExifを1個だけ挿入する。
       // 目標構造: SOI → APP0/JFIF → APP1/Exif → その他セグメント
-      async function _jpegWithMinimalExif(blob, info) {
+      async function _jpegWithE4Exif(blob, info) {
         const original = new Uint8Array(await blob.arrayBuffer());
         if (original[0] !== 0xFF || original[1] !== 0xD8) return blob;
 
         const src = _stripExistingExifApp1(original);
-        const app1 = _minimalExifApp1(info);
+        const app1 = _e4ExifApp1(info);
 
         let pos = 2; // APP0が無ければSOI直後
         if (src.length > 6 && src[2] === 0xFF && src[3] === 0xE0) {
@@ -2539,15 +2581,15 @@
         const date=new Date(), lat=currentGpsLat, lng=currentGpsLng;
         const a=await _canvasBlob(clean);
         const b=await _canvasBlob(over);
-        const c=await _jpegWithMinimalExif(a,{date,lat,lng,width:OUT_W,height:OUT_H});
-        const d=await _jpegWithMinimalExif(b,{date,lat,lng,width:OUT_W,height:OUT_H});
+        const c=await _jpegWithE4Exif(a,{date,width:OUT_W,height:OUT_H});
+        const d=await _jpegWithE4Exif(b,{date,width:OUT_W,height:OUT_H});
         const kp=_currentKP()||'不明';
         const stamp=`${date.getFullYear()}${String(date.getMonth()+1).padStart(2,'0')}${String(date.getDate()).padStart(2,'0')}_${String(date.getHours()).padStart(2,'0')}${String(date.getMinutes()).padStart(2,'0')}${String(date.getSeconds()).padStart(2,'0')}`;
         const items=[
           {code:'A',name:`TEST_A_NOEXIF_NOOVERLAY_${stamp}.jpg`,blob:a,label:'Exifなし・焼き込みなし'},
           {code:'B',name:`TEST_B_NOEXIF_OVERLAY_${stamp}.jpg`,blob:b,label:'Exifなし・焼き込みあり'},
-          {code:'C',name:`TEST_C_MINEXIF_NOOVERLAY_${stamp}.jpg`,blob:c,label:'最小Exif・焼き込みなし'},
-          {code:'D',name:`TEST_D_MINEXIF_OVERLAY_${stamp}.jpg`,blob:d,label:'最小Exif・焼き込みあり'}
+          {code:'C',name:`TEST_C_E4EXIF_NOOVERLAY_${stamp}.jpg`,blob:c,label:'E4基本Exif・焼き込みなし'},
+          {code:'D',name:`TEST_D_E4EXIF_OVERLAY_${stamp}.jpg`,blob:d,label:'E4基本Exif・焼き込みあり'}
         ];
         const st=document.getElementById('shakan-test-status');
         if(st)st.textContent='A～D生成済み。Google Driveへ送信中...';
