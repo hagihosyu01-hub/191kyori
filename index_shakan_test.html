@@ -1045,7 +1045,7 @@
       <!-- 写管屋4パターン比較テスト：生成・アップロード状況 -->
       <div id="shakan-test-panel" style="display:none;position:absolute;left:4%;right:4%;bottom:22px;z-index:30;background:rgba(0,0,0,.88);color:#fff;padding:14px;border-radius:12px;text-align:left;font-size:13px;line-height:1.5;">
         <div style="font-weight:bold;font-size:15px;margin-bottom:6px;">写管屋4パターン比較テスト</div>
-        <div id="shakan-test-status">撮影するとA～Dを同時生成します。</div>
+        <div id="shakan-test-status">撮影するとA～Dを同時生成します。V2は既存Exifを除去し、Exifを1個だけAPP0/JFIFの後ろに入れます。</div>
       </div>
 
       <div id="fall-toast"></div>
@@ -1235,7 +1235,7 @@
         const PIN_SVG = '<svg class="pin-ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="#e53935" d="M12 2c-3.9 0-7 3.1-7 7 0 5.2 7 13 7 13s7-7.8 7-13c0-3.9-3.1-7-7-7z"/><circle cx="12" cy="9" r="2.6" fill="#fff"/></svg>';
         cameraButtonHtml = '<button onclick="openCamera()" class="btn-camera">📷 カメラを起動 📷</button>';
         fallButtonHtml = '<button onclick="openFallCamera()" class="btn-camera-fall">📷 落下物を撮影 📷</button>';
-        shakanTestButtonHtml = '<button onclick="openShakanTestCamera()" class="btn-shakan-test">🧪 写管屋 4パターンテスト</button>';
+        shakanTestButtonHtml = '<button onclick="openShakanTestCamera()" class="btn-shakan-test">🧪 写管屋 4パターンテスト V2</button>';
         patrolButtonHtml = '<button onclick="openPatrol()" class="btn-patrol">' + CAR_SVG + ' 道路点検 ' + CAR_SVG + '</button>';
         if (res.status !== "圏外です") {
           mapButtonHtml = '<button onclick="openMapModal()" class="btn-map">' + PIN_SVG + ' 現在位置を表示 ' + PIN_SVG + '</button>';
@@ -2436,19 +2436,83 @@
         return new Uint8Array(seg.concat(payload));
       }
 
-      // APP0/JFIFがあれば、その直後へExifを入れる。なければSOI直後。
-      async function _jpegWithMinimalExif(blob, info) {
-        const src=new Uint8Array(await blob.arrayBuffer());
-        if(src[0]!==0xFF||src[1]!==0xD8) return blob;
-        const app1=_minimalExifApp1(info);
-        let pos=2;
-        if(src.length>6 && src[2]===0xFF && src[3]===0xE0){
-          const len=(src[4]<<8)|src[5];
-          if(len>=2 && 2+2+len<=src.length) pos=2+2+len;
+      // JPEG内に既存の APP1/Exif があればすべて除去する。
+      // XMPなど「Exif\0\0」以外のAPP1は残す。
+      function _stripExistingExifApp1(src) {
+        if (!src || src.length < 4 || src[0] !== 0xFF || src[1] !== 0xD8) return src;
+        const chunks = [src.subarray(0, 2)]; // SOI
+        let i = 2;
+
+        while (i + 1 < src.length) {
+          // 画像データに入った、または壊れた並びなら残りをそのまま保持
+          if (src[i] !== 0xFF) { chunks.push(src.subarray(i)); break; }
+
+          let markerPos = i;
+          while (i < src.length && src[i] === 0xFF) i++;
+          if (i >= src.length) break;
+          const marker = src[i++];
+
+          // SOS以降は圧縮画像データなので、そのまま全部保持
+          if (marker === 0xDA) {
+            chunks.push(src.subarray(markerPos));
+            break;
+          }
+
+          // SOI/EOI/RST/TEM は長さフィールドを持たない
+          if (marker === 0xD8 || marker === 0xD9 || (marker >= 0xD0 && marker <= 0xD7) || marker === 0x01) {
+            chunks.push(src.subarray(markerPos, i));
+            if (marker === 0xD9) break;
+            continue;
+          }
+
+          if (i + 1 >= src.length) { chunks.push(src.subarray(markerPos)); break; }
+          const segLen = (src[i] << 8) | src[i + 1];
+          if (segLen < 2) { chunks.push(src.subarray(markerPos)); break; }
+          const segEnd = i + segLen;
+          if (segEnd > src.length) { chunks.push(src.subarray(markerPos)); break; }
+
+          const payloadStart = i + 2;
+          const isExifApp1 = marker === 0xE1 &&
+            payloadStart + 6 <= segEnd &&
+            src[payloadStart]     === 0x45 && // E
+            src[payloadStart + 1] === 0x78 && // x
+            src[payloadStart + 2] === 0x69 && // i
+            src[payloadStart + 3] === 0x66 && // f
+            src[payloadStart + 4] === 0x00 &&
+            src[payloadStart + 5] === 0x00;
+
+          if (!isExifApp1) chunks.push(src.subarray(markerPos, segEnd));
+          i = segEnd;
         }
-        const out=new Uint8Array(src.length+app1.length);
-        out.set(src.subarray(0,pos),0); out.set(app1,pos); out.set(src.subarray(pos),pos+app1.length);
-        return new Blob([out],{type:'image/jpeg'});
+
+        const total = chunks.reduce((n, c) => n + c.length, 0);
+        const out = new Uint8Array(total);
+        let off = 0;
+        chunks.forEach(c => { out.set(c, off); off += c.length; });
+        return out;
+      }
+
+      // 既存Exifを除去したうえで、APP0/JFIFの直後にExifを1個だけ挿入する。
+      // 目標構造: SOI → APP0/JFIF → APP1/Exif → その他セグメント
+      async function _jpegWithMinimalExif(blob, info) {
+        const original = new Uint8Array(await blob.arrayBuffer());
+        if (original[0] !== 0xFF || original[1] !== 0xD8) return blob;
+
+        const src = _stripExistingExifApp1(original);
+        const app1 = _minimalExifApp1(info);
+
+        let pos = 2; // APP0が無ければSOI直後
+        if (src.length > 6 && src[2] === 0xFF && src[3] === 0xE0) {
+          const len = (src[4] << 8) | src[5];
+          const app0End = 2 + 2 + len;
+          if (len >= 2 && app0End <= src.length) pos = app0End;
+        }
+
+        const out = new Uint8Array(src.length + app1.length);
+        out.set(src.subarray(0, pos), 0);
+        out.set(app1, pos);
+        out.set(src.subarray(pos), pos + app1.length);
+        return new Blob([out], { type: 'image/jpeg' });
       }
 
       function _canvasBlob(canvas) {
