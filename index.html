@@ -133,6 +133,20 @@
         box-shadow: 0 0.5vw 0.75vw rgba(0,0,0,0.2);
       }
 
+      /* E4本番版の識別表示（PWAキャッシュ確認用） */
+      .e4-version-badge {
+        display: inline-block;
+        margin: 0.8vw auto 1.8vw;
+        padding: 1.2vw 2.4vw;
+        background: #111;
+        color: #00e676;
+        border: 0.25vw solid #00c853;
+        border-radius: 1vw;
+        font-size: 3.2vw;
+        font-weight: 900;
+        letter-spacing: 0.04em;
+      }
+
       /* 下部の注意書きボックス */
       .info-box {
         margin-top: 3.75vw;
@@ -3621,6 +3635,7 @@
 
         document.getElementById("status").innerHTML = "R191萩保守管内距離標";
         document.getElementById("output").innerHTML =
+          '<div class="e4-version-badge">E4本番版 v3.76-E4 / 2026-09-10</div>' +
           '<span class="kilo-post">' + displayStatus + '</span>' +
           '<div><span class="distance-display">マスタ ' + res.baseMaster + ' から ' + res.distance + '</span></div>' +
           drawingHtml +
@@ -3632,8 +3647,9 @@
           shareButtonHtml +
           '<a href="' + siteUrl + '" target="_top" class="btn-back">🔗 X.com/萩保守 🔗</a>' +
           '<div class="info-box">' +
-          '<span class="info-title">【いろいろ説明v3.76】</span>' +         
+          '<span class="info-title">【いろいろ説明 v3.76-E4】</span>' +         
           '・周囲の環境により5～10m以上の誤差が生じる場合があります。<br>' +
+          '・v3.76-E4：写管屋で撮影日認識確認済みのE4方式Exifを使用しています（GPSはExifに入れません）。<br>' +
           '・ver3.76：ライトのボタンが 消灯→フラッシュ（撮影時だけ光る）→常時点灯 の切り替えになりました。<br>' +
           '・ver3.75：写真にExif（撮影日時・GPSの緯度経度・距離標）を入れるようにしました。<br>' +
           '・ver3.74：落下物の3枚に SHA-256（改ざん検出用のハッシュ）を付けて保存します。確認画面にも表示されます。<br>' +
