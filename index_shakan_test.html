@@ -1582,6 +1582,10 @@
         _startCameraStream(want);
       }
 
+      function openShakanTestCamera() {
+        openCamera('shakan');
+      }
+
       function openCamera(patrol) {
         // 後方互換：true が渡された場合は 'patrol' 扱い
         cameraMode = (patrol === true) ? 'patrol' : (patrol || 'normal');
