@@ -135,15 +135,11 @@
 
       /* E4本番版の識別表示（PWAキャッシュ確認用） */
       .e4-version-badge {
-        display: inline-block;
-        margin: 0.8vw auto 1.8vw;
-        padding: 1.2vw 2.4vw;
-        background: #111;
-        color: #00e676;
-        border: 0.25vw solid #00c853;
-        border-radius: 1vw;
-        font-size: 3.2vw;
-        font-weight: 900;
+        display: block;
+        margin: 0.2vw auto 1.2vw;
+        color: #a0a4aa;
+        font-size: 2.6vw;
+        font-weight: normal;
         letter-spacing: 0.04em;
       }
 
@@ -700,6 +696,95 @@
       #kp-go     { background: #00897b; }
 
       /* ===== 巡回点検モーダル ===== */
+      /* ===== 落下物：撮影前の選択画面（方向・種類） ===== */
+      #fall-select-modal {
+        display: none;
+        position: fixed;
+        top: 0; left: 0;
+        width: 100vw; height: 100vh;
+        background: #1a1a2e;
+        z-index: 7500;
+        flex-direction: column;
+        overflow-y: auto;
+        padding: 4vw 4vw 6vw;
+        box-sizing: border-box;
+        color: #fff;
+      }
+      #fall-select-modal h2 {
+        margin: 1vw 12vw 1vw 0;
+        font-size: 6vw;
+      }
+      #fall-select-kp {
+        color: #ffd11a;
+        font-size: 4.2vw;
+        font-weight: bold;
+        margin-bottom: 3vw;
+      }
+      .fs-label {
+        font-size: 4vw;
+        font-weight: bold;
+        color: #aab4d4;
+        margin: 3vw 0 2vw;
+      }
+      .fs-row  { display: grid; grid-template-columns: 1fr 1fr; gap: 2.5vw; }
+      .fs-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2vw; }
+      .fs-sub {
+        font-size: 3.4vw;
+        color: #ffd11a;
+        margin: 2vw 0 1.5vw;
+      }
+      .fs-btn {
+        padding: 3.2vw 1vw;
+        font-size: 4.6vw;
+        font-weight: bold;
+        border-radius: 3vw;
+        border: 2px solid #0f3460;
+        background: #16213e;
+        color: #fff;
+        cursor: pointer;
+      }
+      .fs-row .fs-btn { font-size: 6vw; padding: 3vw 1vw; line-height: 1.25; }
+      .fs-row .fs-btn small {
+        display: block;
+        font-size: 3.4vw;
+        font-weight: normal;
+        opacity: 0.85;
+        margin-top: 0.6vw;
+      }
+      .fs-btn.sel {
+        background: #e8590c;
+        border-color: #ffd11a;
+        box-shadow: 0 0 0 2px #ffd11a inset;
+      }
+      #fall-select-start {
+        margin-top: 5vw;
+        width: 100%;
+        padding: 4.5vw;
+        font-size: 5.5vw;
+        font-weight: bold;
+        border: none;
+        border-radius: 3vw;
+        background: #0d8f3f;
+        color: #fff;
+        cursor: pointer;
+      }
+      #fall-select-start:disabled { background: #444; color: #999; }
+      #fall-select-close {
+        position: absolute;
+        top: 3vw; right: 3vw;
+        width: 10vw; height: 10vw;
+        border-radius: 50%;
+        background: rgba(255,255,255,0.15);
+        border: 2px solid #fff;
+        color: #fff;
+        font-size: 5vw;
+        font-weight: bold;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
       #patrol-modal {
         display: none;
         position: fixed;
@@ -961,6 +1046,24 @@
 
     <!-- 巡回点検トースト -->
     <div id="patrol-toast"></div>
+
+    <!-- 落下物：撮影前に方向と種類を選ぶ画面 -->
+    <div id="fall-select-modal">
+      <button id="fall-select-close" onclick="closeFallSelect()" aria-label="閉じる">✕</button>
+      <h2>📷 益田方面に向かって撮影</h2>
+      <div id="fall-select-kp">距離標 ---</div>
+
+      <div class="fs-label">方向</div>
+      <div class="fs-row" id="fs-dir">
+        <button class="fs-btn" data-v="上り" onclick="fallSelectPick('dir', this)">上り<small>（下関方面）</small></button>
+        <button class="fs-btn" data-v="下り" onclick="fallSelectPick('dir', this)">下り<small>（益田方面）</small></button>
+      </div>
+
+      <div class="fs-label">種類</div>
+      <div id="fs-kind"></div>
+
+      <button id="fall-select-start" onclick="fallSelectStart()" disabled>方向と種類を選んでください</button>
+    </div>
 
     <!-- 図面表示モーダル -->
     <div id="map-modal">
@@ -3566,28 +3669,16 @@
       function _latText() { return (currentGpsLat !== null) ? currentGpsLat.toFixed(6) : "---"; }
       function _lngText() { return (currentGpsLng !== null) ? currentGpsLng.toFixed(6) : "---"; }
 
-      // 圏外表示中は緯度経度の部分だけを書き換える（全体は再描画しない）
-      function _updateOutOfRangeCoords() {
-        const el = document.getElementById("oor-coord");
-        if (!el) return;
-        el.textContent = "緯度 " + _latText() + " / 経度 " + _lngText();
-      }
-
       function showResult(res) {
-        // ★同じKP値なら表示を更新しない（圏外中は緯度経度だけリアルタイム更新）
-        if (res.status === lastDisplayedKP) {
-          if (res.status === "圏外です") _updateOutOfRangeCoords();
-          return;
-        }
+        // ★同じKP値なら表示を更新しない
+        if (res.status === lastDisplayedKP) return;
         lastDisplayedKP = res.status;
         const siteUrl = "https://x.com/hagihosyu";
         latestKiloPost = res.status;
 
         let displayStatus = res.status;
         if (res.status === "圏外です") {
-          displayStatus = '圏外<span style="font-size:0.5em;">です</span>' +
-            '<br><span id="oor-coord" style="font-size:0.3em;">緯度 ' + _latText() +
-            ' / 経度 ' + _lngText() + '</span>';
+          displayStatus = '圏外<span style="font-size:0.5em;">です</span>';
         }
 
         let drawingHtml = "";
@@ -3617,7 +3708,7 @@
         const CAR_SVG = '<svg class="car-ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="#ffd11a" d="M5 11l1.3-3.9C6.6 6.2 7.4 5.6 8.3 5.6h7.4c.9 0 1.7.6 2 1.5L19 11l1.4.5c.4.1.6.5.6.9V17c0 .6-.4 1-1 1h-1c-.6 0-1-.4-1-1v-1H6v1c0 .6-.4 1-1 1H4c-.6 0-1-.4-1-1v-4.6c0-.4.2-.8.6-.9L5 11z"/><path fill="#fff3b0" d="M7.6 7.6l-.8 3h10.4l-.8-3c-.1-.4-.5-.7-.95-.7H8.55c-.45 0-.85.3-.95.7z"/><circle cx="7.5" cy="15.5" r="1.5" fill="#333"/><circle cx="16.5" cy="15.5" r="1.5" fill="#333"/></svg>';
         const PIN_SVG = '<svg class="pin-ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="#e53935" d="M12 2c-3.9 0-7 3.1-7 7 0 5.2 7 13 7 13s7-7.8 7-13c0-3.9-3.1-7-7-7z"/><circle cx="12" cy="9" r="2.6" fill="#fff"/></svg>';
         cameraButtonHtml = '<button onclick="openCamera()" class="btn-camera">📷 カメラを起動 📷</button>';
-        fallButtonHtml = '<button onclick="openFallCamera()" class="btn-camera-fall">📷 落下物を撮影 📷</button>';
+        fallButtonHtml = '<button onclick="openFallSelect()" class="btn-camera-fall">📷 落下物を撮影 📷</button>';
         patrolButtonHtml = '<button onclick="openPatrol()" class="btn-patrol">' + CAR_SVG + ' 道路点検 ' + CAR_SVG + '</button>';
         if (res.status !== "圏外です") {
           mapButtonHtml = '<button onclick="openMapModal()" class="btn-map">' + PIN_SVG + ' 現在位置を表示 ' + PIN_SVG + '</button>';
@@ -3627,9 +3718,8 @@
 
         document.getElementById("status").innerHTML = "R191萩保守管内距離標";
         document.getElementById("output").innerHTML =
-          '<div class="e4-version-badge">v3.77-E4</div>' +
+          '<div class="e4-version-badge">v3.79-E4</div>' +
           '<span class="kilo-post">' + displayStatus + '</span>' +
-          '<div><span class="distance-display">マスタ ' + res.baseMaster + ' から ' + res.distance + '</span></div>' +
           drawingHtml +
           patrolButtonHtml +
           mapButtonHtml +
@@ -3639,8 +3729,10 @@
           shareButtonHtml +
           '<a href="' + siteUrl + '" target="_top" class="btn-back">🔗 X.com/萩保守 🔗</a>' +
           '<div class="info-box">' +
-          '<span class="info-title">【いろいろ説明 v3.76-E4】</span>' +         
+          '<span class="info-title">【いろいろ説明 v3.79-E4】</span>' +         
           '・周囲の環境により5～10m以上の誤差が生じる場合があります。<br>' +
+          '・v3.79-E4：落下物の種類を変更（動物11種類・物6種類）。写真の文字に撮影月日・時刻と「R7」を追加しました。<br>' +
+          '・v3.78-E4：落下物の撮影前に「上り／下り」と種類を選べるようにしました。写真の文字に入ります。<br>' +
           '・v3.76-E4：写管屋で撮影日認識確認済みのE4方式Exifを使用しています（GPSはExifに入れません）。<br>' +
           '・ver3.76：ライトのボタンが 消灯→フラッシュ（撮影時だけ光る）→常時点灯 の切り替えになりました。<br>' +
           '・ver3.75：写真にExif（撮影日時・GPSの緯度経度・距離標）を入れるようにしました。<br>' +
@@ -3725,7 +3817,13 @@
           - (parseFloat(cs.paddingRight) || 0);
         const textW = el.getBoundingClientRect().width;
         if (avail > 0 && textW > avail) {
-          el.style.fontSize = Math.max(9, Math.floor(18 * avail / textW)) + 'px';
+          // 比率で一気に縮め、それでもはみ出す場合は1pxずつ詰める（最小6px）
+          let px = Math.max(6, Math.floor(18 * avail / textW));
+          el.style.fontSize = px + 'px';
+          while (px > 6 && el.getBoundingClientRect().width > avail) {
+            px--;
+            el.style.fontSize = px + 'px';
+          }
         }
       }
 
@@ -3769,15 +3867,95 @@
       }
 
       function _getOverlayText() {
-        // 落下物モードは工程名（処理前／近景／処理後）を焼き込む
-        // 日時は焼き込まない（写真のプロパティとファイル名には残ります）
-        const stage = (cameraMode === 'fall') ? ('_' + FALL_STEPS[fallStep]) : '';
-        return '--R191_' + _currentKP() + stage + '_hagihosyukouji--';
+        // 落下物：--R191_102k100_下り_ネコ_処理前_09/11 10:24_R7hagihosyukouji--
+        //   方向・種類・工程と、撮影した月日・時刻（MM/dd HH:mm）を入れる
+        if (cameraMode === 'fall') {
+          const now = new Date();
+          const p2 = (n) => String(n).padStart(2, '0');
+          const mdhm = p2(now.getMonth() + 1) + '/' + p2(now.getDate()) + ' ' +
+                       p2(now.getHours()) + ':' + p2(now.getMinutes());
+          let mid = '';
+          if (fallDirection) mid += '_' + fallDirection;
+          if (fallKind)      mid += '_' + fallKind;
+          mid += '_' + FALL_STEPS[fallStep];
+          return '--R191_' + _currentKP() + mid + '_' + mdhm + '_R7hagihosyukouji--';
+        }
+        // 通常撮影・その他異常は従来どおり（日時なし）
+        return '--R191_' + _currentKP() + '_hagihosyukouji--';
       }
 
       // 巡回点検「その他異常」用：撮影後にLINE送信モードでカメラを開く
       function openPatrolCamera() {
         openCamera('patrol');
+      }
+
+      // ===== 落下物：撮影前の選択（方向・種類） =====
+      const FALL_KIND_GROUPS = [
+        { name: '動物（死骸）', kinds: ['シカ', 'イノシシ', 'タヌキ', 'イタチテン', 'アナグマ',
+                                         'サル', 'ネコ', 'イヌ', '鳥類', 'ヌートリア', 'その他死骸'] },
+        { name: '物',           kinds: ['落下物', '土砂落石', '木・枝', '飛散物', '車両部品', 'その他'] }
+      ];
+      let fallDirection = '';   // '上り' | '下り'
+      let fallKind = '';        // FALL_KIND_GROUPS のどれか
+
+      function openFallSelect() {
+        // 毎回あらためて選んでもらう（前回の選択が残って誤記録にならないように）
+        fallDirection = '';
+        fallKind = '';
+        const box = document.getElementById('fs-kind');
+        if (!box.children.length) {
+          FALL_KIND_GROUPS.forEach(function(g) {
+            const sub = document.createElement('div');
+            sub.className = 'fs-sub';
+            sub.textContent = g.name;
+            box.appendChild(sub);
+            const grid = document.createElement('div');
+            grid.className = 'fs-grid';
+            g.kinds.forEach(function(k) {
+              const b = document.createElement('button');
+              b.className = 'fs-btn';
+              b.dataset.v = k;
+              b.textContent = k;
+              b.onclick = function() { fallSelectPick('kind', b); };
+              grid.appendChild(b);
+            });
+            box.appendChild(grid);
+          });
+        }
+        document.querySelectorAll('#fall-select-modal .fs-btn').forEach(function(b) {
+          b.classList.remove('sel');
+        });
+        document.getElementById('fall-select-kp').textContent = '距離標 ' + (_currentKP() || '---');
+        _fallSelectRefresh();
+        document.getElementById('fall-select-modal').style.display = 'flex';
+      }
+
+      function closeFallSelect() {
+        document.getElementById('fall-select-modal').style.display = 'none';
+      }
+
+      function fallSelectPick(group, btn) {
+        const box = document.getElementById(group === 'dir' ? 'fs-dir' : 'fs-kind');
+        box.querySelectorAll('.fs-btn').forEach(function(b) { b.classList.remove('sel'); });
+        btn.classList.add('sel');
+        if (group === 'dir') fallDirection = btn.dataset.v;
+        else                 fallKind      = btn.dataset.v;
+        _fallSelectRefresh();
+      }
+
+      function _fallSelectRefresh() {
+        const start = document.getElementById('fall-select-start');
+        const ok = !!(fallDirection && fallKind);
+        start.disabled = !ok;
+        start.textContent = ok
+          ? '📷 撮影開始（' + fallDirection + '／' + fallKind + '）'
+          : '方向と種類を選んでください';
+      }
+
+      function fallSelectStart() {
+        if (!fallDirection || !fallKind) return;
+        closeFallSelect();
+        openFallCamera();
       }
 
       // 落下物：処理前 → 近景 → 処理後 の3枚撮影モードでカメラを開く
@@ -4943,9 +5121,10 @@
         if (!title || !count) return;
         const lensName = (FALL_LENS[fallStep] === 'wide' && cameraWideOk) ? '広角' : '標準';
         title.textContent = '落下物：' + FALL_STEPS[fallStep] + '（' + lensName + '）';
-        count.textContent = (fallRetakeIndex !== null)
+        const sel = (fallDirection && fallKind) ? (fallDirection + '／' + fallKind + '　') : '';
+        count.textContent = sel + ((fallRetakeIndex !== null)
           ? '撮り直し中'
-          : (fallStep + 1) + ' / ' + FALL_STEPS.length + ' 枚目';
+          : (fallStep + 1) + ' / ' + FALL_STEPS.length + ' 枚目');
       }
 
       function _fallUpdateThumbs() {
@@ -5009,6 +5188,7 @@
         const list = document.getElementById('fall-review-list');
         document.getElementById('fall-review-kp').textContent =
           '距離標 ' + (fallShots[0] ? fallShots[0].kp : '---') +
+          ((fallDirection && fallKind) ? '　' + fallDirection + '／' + fallKind : '') +
           '　' + (fallShots[0] ? fallShots[0].date + ' ' + fallShots[0].time : '');
         list.innerHTML = '';
         fallShots.forEach(function(s, i) {
@@ -5086,6 +5266,8 @@
                 fileName: 'R191_' + safeKP + '_' + stamp + '_' + (i + 1) + '_' + FALL_STEPS[i] + '.jpg',
                 kp: kp, date: date, time: time, user: user,
                 event: '落下物',
+                direction: fallDirection,
+                kind: fallKind,
                 message: '📍 ' + kp + '\n🧱 落下物（' + FALL_STEPS[i] + ' ' + (i + 1) + '/' + fallShots.length + '）\n🕐 ' + date + ' ' + time + (user ? '\n👤 ' + user : '') + _locLinesFrom(fallShots[0].lat, fallShots[0].lng),
                 image: base64,
                 mimeType: 'image/jpeg'
