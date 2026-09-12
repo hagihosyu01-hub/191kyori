@@ -743,13 +743,16 @@
         color: #fff;
         cursor: pointer;
       }
-      .fs-row .fs-btn { font-size: 6vw; padding: 3vw 1vw; line-height: 1.25; }
+      .fs-row .fs-btn { font-size: 6vw; padding: 2.2vw 1vw; line-height: 1.2; }
       .fs-row .fs-btn small {
         display: block;
-        font-size: 3.4vw;
+        font-size: 3.2vw;
         font-weight: normal;
-        opacity: 0.85;
-        margin-top: 0.6vw;
+        opacity: 0.8;
+      }
+      .fs-row .fs-btn .dir-main {
+        display: block;
+        margin: 0.8vw 0;
       }
       .fs-btn.sel {
         background: #e8590c;
@@ -1053,16 +1056,16 @@
       <h2>📷 益田方面に向かって撮影</h2>
       <div id="fall-select-kp">距離標 ---</div>
 
-      <div class="fs-label">方向</div>
+      <div class="fs-label">車線</div>
       <div class="fs-row" id="fs-dir">
-        <button class="fs-btn" data-v="上り" onclick="fallSelectPick('dir', this)">上り<small>（下関方面）</small></button>
-        <button class="fs-btn" data-v="下り" onclick="fallSelectPick('dir', this)">下り<small>（益田方面）</small></button>
+        <button class="fs-btn" data-v="下り" onclick="fallSelectPick('dir', this)"><small>（益田方面）</small><span class="dir-main">↑下り</span><small>（下関方面）</small></button>
+        <button class="fs-btn" data-v="上り" onclick="fallSelectPick('dir', this)"><small>（益田方面）</small><span class="dir-main">↓上り</span><small>（下関方面）</small></button>
       </div>
 
       <div class="fs-label">種類</div>
       <div id="fs-kind"></div>
 
-      <button id="fall-select-start" onclick="fallSelectStart()" disabled>方向と種類を選んでください</button>
+      <button id="fall-select-start" onclick="fallSelectStart()" disabled>車線と種類を選んでください</button>
     </div>
 
     <!-- 図面表示モーダル -->
@@ -3949,7 +3952,7 @@
         start.disabled = !ok;
         start.textContent = ok
           ? '📷 撮影開始（' + fallDirection + '／' + fallKind + '）'
-          : '方向と種類を選んでください';
+          : '車線と種類を選んでください';
       }
 
       function fallSelectStart() {
