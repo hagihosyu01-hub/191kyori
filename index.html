@@ -706,7 +706,7 @@
         z-index: 7500;
         flex-direction: column;
         overflow-y: auto;
-        padding: 4vw 4vw 6vw;
+        padding: 3vw 4vw 5vw;
         box-sizing: border-box;
         color: #fff;
       }
@@ -718,23 +718,23 @@
         color: #ffd11a;
         font-size: 4.2vw;
         font-weight: bold;
-        margin-bottom: 3vw;
+        margin-bottom: 1.2vw;
       }
       .fs-label {
         font-size: 4vw;
         font-weight: bold;
         color: #aab4d4;
-        margin: 3vw 0 2vw;
+        margin: 2vw 0 1.4vw;
       }
       .fs-row  { display: grid; grid-template-columns: 1fr 1fr; gap: 2.5vw; }
-      .fs-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2vw; }
+      .fs-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.6vw; }
       .fs-sub {
         font-size: 3.4vw;
         color: #ffd11a;
-        margin: 2vw 0 1.5vw;
+        margin: 1.2vw 0 1vw;
       }
       .fs-btn {
-        padding: 3.2vw 1vw;
+        padding: 2.5vw 1vw;
         font-size: 4.6vw;
         font-weight: bold;
         border-radius: 3vw;
@@ -759,8 +759,60 @@
         border-color: #ffd11a;
         box-shadow: 0 0 0 2px #ffd11a inset;
       }
+      /* トンネル内など：距離標の手入力 */
+      #fs-manual-toggle {
+        align-self: center;
+        margin-top: 0.5vw;
+        padding: 2vw 3.5vw;
+        font-size: 3.6vw;
+        font-weight: bold;
+        border-radius: 5vw;
+        border: 1.5px dashed #aab4d4;
+        background: transparent;
+        color: #dfe5f5;
+        cursor: pointer;
+      }
+      #fs-manual-toggle.open { border-style: solid; border-color: #ffd11a; color: #ffd11a; }
+      #fs-manual {
+        display: none;
+        margin-top: 1.5vw;
+        padding: 2vw 3vw;
+        border-radius: 3vw;
+        background: #16213e;
+        border: 2px solid #ffd11a;
+      }
+      .fs-manual-row {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 2vw;
+      }
+      .fs-manual-row select,
+      .fs-manual-row input {
+        font-size: 6vw;
+        font-weight: bold;
+        text-align: center;
+        border: 2px solid #0f3460;
+        border-radius: 2vw;
+        padding: 1.5vw 1vw;
+        background: #fff;
+        color: #111;
+      }
+      #fs-man-km { width: 32vw; }
+      #fs-man-m  { width: 24vw; }
+      .fs-manual-row .kp-unit { color: #fff; font-size: 6vw; font-weight: bold; }
+      #fs-manual-msg {
+        text-align: center;
+        font-size: 3.2vw;
+        color: #aab4d4;
+        margin-top: 1vw;
+      }
+
       #fall-select-start {
-        margin-top: 5vw;
+        position: sticky;
+        bottom: 0;
+        box-shadow: 0 -3vw 3vw #1a1a2e;   /* 下を流れる一覧との境目をなじませる */
+        margin-top: 3.5vw;
         width: 100%;
         padding: 4.5vw;
         font-size: 5.5vw;
@@ -1055,6 +1107,15 @@
       <button id="fall-select-close" onclick="closeFallSelect()" aria-label="閉じる">✕</button>
       <h2>📷 益田方面に向かって撮影</h2>
       <div id="fall-select-kp">距離標 ---</div>
+      <button id="fs-manual-toggle" onclick="fallManualToggle()">🚇 トンネル内など：距離標を手入力</button>
+      <div id="fs-manual">
+        <div class="fs-manual-row">
+          <select id="fs-man-km" onchange="_fallManualUpdate()"></select>
+          <span class="kp-unit">k</span>
+          <input id="fs-man-m" type="number" inputmode="numeric" min="0" max="999" placeholder="000" oninput="_fallManualUpdate()">
+        </div>
+        <div id="fs-manual-msg">メートル（0〜999）を入力してください</div>
+      </div>
 
       <div class="fs-label">車線</div>
       <div class="fs-row" id="fs-dir">
@@ -3721,7 +3782,7 @@
 
         document.getElementById("status").innerHTML = "R191萩保守管内距離標";
         document.getElementById("output").innerHTML =
-          '<div class="e4-version-badge">v3.79-E4</div>' +
+          '<div class="e4-version-badge">v3.80-E4</div>' +
           '<span class="kilo-post">' + displayStatus + '</span>' +
           drawingHtml +
           patrolButtonHtml +
@@ -3732,8 +3793,9 @@
           shareButtonHtml +
           '<a href="' + siteUrl + '" target="_top" class="btn-back">🔗 X.com/萩保守 🔗</a>' +
           '<div class="info-box">' +
-          '<span class="info-title">【いろいろ説明 v3.79-E4】</span>' +         
+          '<span class="info-title">【いろいろ説明 v3.80-E4】</span>' +         
           '・周囲の環境により5～10m以上の誤差が生じる場合があります。<br>' +
+          '・v3.80-E4：落下物の撮影前の画面で、トンネル内などGPSが届かないときに距離標を手入力できるようにしました。道路点検のカメラを広角にしました。<br>' +
           '・v3.79-E4：落下物の種類を変更（動物11種類・物6種類）。写真の文字に撮影月日・時刻と「R7」を追加しました。<br>' +
           '・v3.78-E4：落下物の撮影前に「上り／下り」と種類を選べるようにしました。写真の文字に入ります。<br>' +
           '・v3.76-E4：写管屋で撮影日認識確認済みのE4方式Exifを使用しています（GPSはExifに入れません）。<br>' +
@@ -3805,6 +3867,8 @@
 
       // 現在有効な距離標（固定中は固定値、それ以外は最新値／圏外なら緯度経度）
       function _currentKP() {
+        // 落下物でトンネル内などの手入力があれば、それを最優先
+        if (cameraMode === 'fall' && fallManualKP) return fallManualKP;
         return (kpLocked && lockedKP !== null) ? lockedKP : _kpWithCoords(latestKiloPost);
       }
 
@@ -3896,15 +3960,23 @@
       const FALL_KIND_GROUPS = [
         { name: '動物（死骸）', kinds: ['シカ', 'イノシシ', 'タヌキ', 'イタチテン', 'アナグマ',
                                          'サル', 'ネコ', 'イヌ', '鳥類', 'ヌートリア', 'その他死骸'] },
-        { name: '物',           kinds: ['落下物', '土砂落石', '木・枝', '飛散物', '車両部品', 'その他'] }
+        { name: '物',           kinds: ['積荷落下', '土砂落石', '落枝', '飛散物', '車両部品', 'ゴミ', 'その他'] }
       ];
       let fallDirection = '';   // '上り' | '下り'
       let fallKind = '';        // FALL_KIND_GROUPS のどれか
+      let fallManualOpen = false;   // 距離標の手入力欄を開いているか
+      let fallManualKP   = '';      // 手入力した距離標（例 120k045）。空ならGPSの距離標を使う
 
       function openFallSelect() {
         // 毎回あらためて選んでもらう（前回の選択が残って誤記録にならないように）
         fallDirection = '';
         fallKind = '';
+        fallManualOpen = false;
+        fallManualKP = '';
+        document.getElementById('fs-manual').style.display = 'none';
+        const mt = document.getElementById('fs-manual-toggle');
+        mt.textContent = '🚇 トンネル内など：距離標を手入力';
+        mt.classList.remove('open');
         const box = document.getElementById('fs-kind');
         if (!box.children.length) {
           FALL_KIND_GROUPS.forEach(function(g) {
@@ -3946,13 +4018,59 @@
         _fallSelectRefresh();
       }
 
+      // トンネル内などGPSが届かないとき用：距離標を手で入れる
+      function fallManualToggle() {
+        fallManualOpen = !fallManualOpen;
+        const btn = document.getElementById('fs-manual-toggle');
+        btn.textContent = fallManualOpen ? '↩ GPSの距離標に戻す' : '🚇 トンネル内など：距離標を手入力';
+        btn.classList.toggle('open', fallManualOpen);
+        document.getElementById('fs-manual').style.display = fallManualOpen ? 'block' : 'none';
+        if (fallManualOpen) {
+          const sel = document.getElementById('fs-man-km');
+          if (!sel.options.length) {
+            _kpPrefixList(true).forEach(function(pref) {
+              const op = document.createElement('option');
+              op.value = pref;
+              op.textContent = pref;
+              sel.appendChild(op);
+            });
+          }
+          // トンネルに入る前の距離標があれば、そのkmを初期値にする
+          const cur = _parseLabel(latestKiloPost);
+          if (cur) sel.value = cur.prefix;
+          const m = document.getElementById('fs-man-m');
+          m.value = '';
+          setTimeout(function() { m.focus(); }, 50);
+        }
+        _fallManualUpdate();
+      }
+
+      function _fallManualUpdate() {
+        const kpLine = document.getElementById('fall-select-kp');
+        const msg    = document.getElementById('fs-manual-msg');
+        if (!fallManualOpen) {
+          fallManualKP = '';
+          kpLine.textContent = '距離標 ' + (_currentKP() || '---');
+        } else {
+          const km  = document.getElementById('fs-man-km').value;
+          const raw = document.getElementById('fs-man-m').value.trim();
+          fallManualKP = (km && /^[0-9]{1,3}$/.test(raw)) ? (km + 'k' + raw.padStart(3, '0')) : '';
+          kpLine.textContent = fallManualKP ? ('距離標 ' + fallManualKP + '（手入力）')
+                                            : '距離標 ---（入力してください）';
+          msg.textContent = fallManualKP ? ('写真には「' + fallManualKP + '」が入ります')
+                                         : 'メートル（0〜999）を入力してください';
+        }
+        _fallSelectRefresh();
+      }
+
       function _fallSelectRefresh() {
         const start = document.getElementById('fall-select-start');
-        const ok = !!(fallDirection && fallKind);
-        start.disabled = !ok;
-        start.textContent = ok
-          ? '📷 撮影開始（' + fallDirection + '／' + fallKind + '）'
-          : '車線と種類を選んでください';
+        const selOk = !!(fallDirection && fallKind);
+        const kpOk  = !fallManualOpen || !!fallManualKP;
+        start.disabled = !(selOk && kpOk);
+        start.textContent = !selOk ? '車線と種類を選んでください'
+                          : !kpOk  ? '距離標を入力してください'
+                          : '📷 撮影開始（' + fallDirection + '／' + fallKind + '）';
       }
 
       function fallSelectStart() {
@@ -4155,7 +4273,7 @@
         document.getElementById('camera-canvas').style.display = 'none';
         document.getElementById('crop-guide').style.display = 'block';
         document.getElementById('camera-kp-overlay').style.display = 'block';
-        document.getElementById('btn-lock').style.display = 'block';
+        document.getElementById('btn-lock').style.display = (cameraMode === 'fall' && fallManualKP) ? 'none' : 'block';
         document.getElementById('btn-capture').style.display = 'block';
         document.getElementById('btn-retake').style.display = 'none';
         document.getElementById('btn-save').style.display = 'none';
@@ -4174,7 +4292,9 @@
         document.documentElement.appendChild(modal);
         modal.style.display = 'flex';
 
-        _startCameraStream(cameraMode === 'fall' ? FALL_LENS[fallStep] : 'normal');
+        _startCameraStream(cameraMode === 'fall'   ? FALL_LENS[fallStep]
+                         : cameraMode === 'patrol' ? 'wide'      // 道路点検は広角
+                         : 'normal');
       }
 
       async function capturePhoto() {
@@ -4186,12 +4306,13 @@
 
         // 落下物の1枚目を撮った瞬間に距離標を固定（残り2枚も同じ距離標にする）
         const shotIdx = (fallRetakeIndex !== null) ? fallRetakeIndex : fallStep;
-        if (cameraMode === 'fall' && shotIdx === 0 && !kpLocked) toggleKpLock();
+        if (cameraMode === 'fall' && shotIdx === 0 && !kpLocked && !fallManualKP) toggleKpLock();
 
         // 写真に焼き込む距離標＝送信・ファイル名にも使う値
         capturedKP = _currentKP();
-        capturedLat = currentGpsLat;
-        capturedLng = currentGpsLng;
+        const manualKP = (cameraMode === 'fall' && !!fallManualKP);
+        capturedLat = manualKP ? null : currentGpsLat;
+        capturedLng = manualKP ? null : currentGpsLng;
 
         const OUT_W = 1280;
         const OUT_H = 960;
@@ -4291,7 +4412,7 @@
         document.getElementById('camera-canvas').style.display = 'none';
         document.getElementById('crop-guide').style.display = 'block';
         document.getElementById('camera-kp-overlay').style.display = 'block';
-        document.getElementById('btn-lock').style.display = 'block';
+        document.getElementById('btn-lock').style.display = (cameraMode === 'fall' && fallManualKP) ? 'none' : 'block';
         document.getElementById('btn-capture').style.display = 'block';
         document.getElementById('btn-retake').style.display = 'none';
         document.getElementById('btn-save').style.display = 'none';
@@ -4554,10 +4675,10 @@
       }
 
       // 図面を持つ距離標の「km（枝番含む）」一覧
-      function _kpPrefixList() {
+      function _kpPrefixList(all) {
         const list = [];
         MASTER_DATA.forEach(function(p) {
-          if (!p.map) return;
+          if (!all && !p.map) return;
           const d = _parseLabel(p.label);
           if (d && list.indexOf(d.prefix) < 0) list.push(d.prefix);
         });
@@ -4872,6 +4993,8 @@
         capturedKP = null;
         capturedLat = null;
         capturedLng = null;
+        fallManualOpen = false;
+        fallManualKP = '';
         const modal = document.getElementById('camera-modal');
         modal.style.display = 'none';
         document.body.appendChild(modal);
@@ -5154,8 +5277,8 @@
           blob: capturedBlob,
           url : URL.createObjectURL(capturedBlob),
           kp  : capturedKP || _currentKP() || '不明',
-          lat : (capturedLat !== null) ? capturedLat : currentGpsLat,
-          lng : (capturedLng !== null) ? capturedLng : currentGpsLng,
+          lat : (capturedLat !== null) ? capturedLat : (fallManualKP ? null : currentGpsLat),
+          lng : (capturedLng !== null) ? capturedLng : (fallManualKP ? null : currentGpsLng),
           date: now.getFullYear() + '/' + String(now.getMonth()+1).padStart(2,'0') + '/' + String(now.getDate()).padStart(2,'0'),
           time: String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0')
         };
