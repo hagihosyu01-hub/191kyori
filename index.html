@@ -743,6 +743,7 @@
         color: #fff;
         cursor: pointer;
       }
+      .fs-grid .fs-btn.fs-long { font-size: 3.9vw; letter-spacing: -0.02em; }
       .fs-row .fs-btn { font-size: 6vw; padding: 2.2vw 1vw; line-height: 1.2; }
       .fs-row .fs-btn small {
         display: block;
@@ -809,6 +810,9 @@
       }
 
       #fall-select-start {
+        flex-shrink: 0;          /* 一覧が長くてもボタン自体は縮めない（文字の上下切れ防止） */
+        white-space: nowrap;
+        overflow: hidden;
         position: sticky;
         bottom: 0;
         box-shadow: 0 -3vw 3vw #1a1a2e;   /* 下を流れる一覧との境目をなじませる */
@@ -3958,9 +3962,10 @@
 
       // ===== 落下物：撮影前の選択（方向・種類） =====
       const FALL_KIND_GROUPS = [
-        { name: '動物（死骸）', kinds: ['シカ', 'イノシシ', 'タヌキ', 'イタチテン', 'アナグマ',
-                                         'サル', 'ネコ', 'イヌ', '鳥類', 'ヌートリア', 'その他死骸'] },
-        { name: '物',           kinds: ['積荷落下', '土砂落石', '落枝', '飛散物', '車両部品', 'ゴミ', 'その他'] }
+        { name: '動物（死骸）', kinds: ['シカ', 'クマ', 'イノシシ', 'タヌキ', 'キツネ', 'イヌネコ',
+                                         'サル', 'イタチテン', 'アナグマ', 'ヌートリア', '鳥類', 'その他死骸'] },
+        { name: '物',           kinds: ['自動車部品', '電化製品', 'プラスチック', 'ビニール', '木材',
+                                         '紙', '布', '鉄', 'ゴミ', 'その他'] }
       ];
       let fallDirection = '';   // '上り' | '下り'
       let fallKind = '';        // FALL_KIND_GROUPS のどれか
@@ -3988,7 +3993,7 @@
             grid.className = 'fs-grid';
             g.kinds.forEach(function(k) {
               const b = document.createElement('button');
-              b.className = 'fs-btn';
+              b.className = 'fs-btn' + (k.length >= 6 ? ' fs-long' : '');
               b.dataset.v = k;
               b.textContent = k;
               b.onclick = function() { fallSelectPick('kind', b); };
@@ -4071,6 +4076,18 @@
         start.textContent = !selOk ? '車線と種類を選んでください'
                           : !kpOk  ? '距離標を入力してください'
                           : '📷 撮影開始（' + fallDirection + '／' + fallKind + '）';
+        _fitStartButton(start);
+      }
+
+      // ボタンの幅に1行で収まるまで文字を小さくする（改行して途中で切れるのを防ぐ）
+      function _fitStartButton(btn) {
+        btn.style.fontSize = '';
+        if (!btn.clientWidth) return;   // 画面が閉じていて測れないとき
+        let px = parseFloat(getComputedStyle(btn).fontSize);
+        while (px > 12 && btn.scrollWidth > btn.clientWidth) {
+          px -= 1;
+          btn.style.fontSize = px + 'px';
+        }
       }
 
       function fallSelectStart() {
