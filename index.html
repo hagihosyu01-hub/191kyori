@@ -134,6 +134,17 @@
       }
 
       /* E4本番版の識別表示（PWAキャッシュ確認用） */
+      /* 引っ越し案内（settings.json の movedTo と違う場所で開いたときだけ出る） */
+      #moved-banner {
+        position: sticky; top: 0; z-index: 6000;
+        background: #fff3cd; color: #5a4400; border-bottom: 3px solid #f0ad4e;
+        padding: 3vw 4vw; text-align: center; font-size: 4vw; line-height: 1.6;
+      }
+      #moved-banner a {
+        display: inline-block; margin-top: 2vw; padding: 2.5vw 6vw; border-radius: 2vw;
+        background: #e8590c; color: #fff; font-weight: bold; text-decoration: none; font-size: 4.6vw;
+      }
+
       .e4-version-badge {
         display: block;
         margin: 0.2vw auto 1.2vw;
@@ -1324,6 +1335,26 @@
         MASTER_DATA = data;
         PATROL_GAS_URL = st.gasUrl || '';
         _applySettingsToDom();
+        _showMovedBanner();
+      }
+
+      // 引っ越し案内：settings.json の movedTo（新しいURL）と違う場所で開かれたら、新しいURLへ案内する
+      function _showMovedBanner() {
+        const to = SETTINGS && SETTINGS.movedTo;
+        if (!to || document.getElementById('moved-banner')) return;
+        let dest;
+        try { dest = new URL(to, location.href); } catch (e) { return; }
+        if (dest.origin === location.origin) return;
+        const d = document.createElement('div');
+        d.id = 'moved-banner';
+        const msg = document.createElement('div');
+        msg.innerHTML = '📢 <b>アプリの住所が変わりました。</b><br>新しいアプリを開いて、ホーム画面に追加し直してください。';
+        const a = document.createElement('a');
+        a.href = dest.href;
+        a.textContent = '新しいアプリを開く';
+        d.appendChild(msg);
+        d.appendChild(a);
+        document.body.insertBefore(d, document.body.firstChild);
       }
 
       // 画面の固定文言に設定を反映
@@ -1334,6 +1365,18 @@
         if (t) t.textContent = '📷 ' + (S.shootToward || S.downDirection) + 'に向かって撮影';
         document.querySelectorAll('.dir-name-down').forEach(function(e) { e.textContent = '（' + S.downDirection + '）'; });
         document.querySelectorAll('.dir-name-up').forEach(function(e) { e.textContent = '（' + S.upDirection + '）'; });
+        // 道路点検の名前ボタン（settings.json に patrolUsers があれば、その名前で作り直す）
+        if (Array.isArray(S.patrolUsers) && S.patrolUsers.length) {
+          const layer = document.getElementById('patrol-name-layer');
+          layer.querySelectorAll('.patrol-name-btn').forEach(function(b) { b.remove(); });
+          S.patrolUsers.forEach(function(name) {
+            const b = document.createElement('button');
+            b.className = 'patrol-name-btn';
+            b.textContent = name;
+            b.addEventListener('click', function() { patrolSelectUser(name); });
+            layer.appendChild(b);
+          });
+        }
       }
 
       let latestKiloPost = "---";
@@ -1513,7 +1556,7 @@
 
         document.getElementById("status").textContent = SETTINGS.routeName + SETTINGS.areaName + "管内距離標";
         document.getElementById("output").innerHTML =
-          '<div class="e4-version-badge">v3.82-E4</div>' +
+          '<div class="e4-version-badge">v3.83-E4</div>' +
           '<span class="kilo-post">' + displayStatus + '</span>' +
           drawingHtml +
           patrolButtonHtml +
@@ -1524,8 +1567,9 @@
           shareButtonHtml +
           (siteUrl ? '<a href="' + siteUrl + '" target="_top" class="btn-back">🔗 ' + (SETTINGS.siteLabel || siteUrl) + ' 🔗</a>' : '') +
           '<div class="info-box">' +
-          '<span class="info-title">【いろいろ説明 v3.82-E4】</span>' +         
+          '<span class="info-title">【いろいろ説明 v3.83-E4】</span>' +         
           '・周囲の環境により5～10m以上の誤差が生じる場合があります。<br>' +
+          '・v3.83-E4：道路点検で選ぶ名前を data/settings.json（patrolUsers）で変えられるようにしました。新しいURLへの引っ越しに対応しました。<br>' +
           '・v3.82-E4：距離標データと現場の設定を data フォルダに分けました（差し替えると別の路線で使えます）。<br>' +
           '・v3.81-E4：距離標を入力すると、その場所の緯度経度を表示します（距離標から図面・トンネル内の手入力）。落下物の写真の下段に緯度経度を入れました。<br>' +
           '・v3.80-E4：落下物の撮影前の画面で、トンネル内などGPSが届かないときに距離標を手入力できるようにしました。道路点検のカメラを広角にしました。<br>' +

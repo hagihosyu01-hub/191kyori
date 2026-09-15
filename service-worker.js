@@ -1,6 +1,6 @@
-const CACHE_NAME = 'r191-kp-v5';
+const CACHE_NAME = 'r191-kp-v6';
 const ASSETS = [
-  'index.html',
+  './',
   'manifest.json',
   'icon-192.png',
   'data/kp.csv',
@@ -11,7 +11,7 @@ const ASSETS = [
 self.addEventListener('install', (e) => {
   e.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS);
+      return cache.addAll(ASSETS.map((u) => new Request(u, { cache: 'reload' })));   // ブラウザに残った古い版をつかまないよう、必ず取り直す
     }).then(() => {
       return self.skipWaiting(); // 新しいサービスワーカーをすぐに有効化
     })
@@ -56,7 +56,7 @@ self.addEventListener('fetch', (e) => {
         const copy = res.clone();
         caches.open(CACHE_NAME).then((c) => c.put(req, copy));
         return res;
-      }).catch(() => caches.match(req).then((c) => c || caches.match('index.html')))
+      }).catch(() => caches.match(req).then((c) => c || caches.match('./')))
     );
     return;
   }
@@ -80,6 +80,6 @@ self.addEventListener('fetch', (e) => {
   // 図面(map_*.webp)はキャッシュに含めないため通信時に取得します。
   e.respondWith(
     caches.match(req).then((cached) => cached || fetch(req))
-      .catch(() => caches.match('index.html'))
+      .catch(() => caches.match('./'))
   );
 });

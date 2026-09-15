@@ -9,5 +9,12 @@
   "fileSuffix": "hagihosyu",
   "gasUrl": "https://script.google.com/macros/s/AKfycbyz3iqSP123DXbSHsjPGeR4eDXdrjeHq2t_oh6TS9378MtpadrYBUWsfiL9L7Avt2a2fQ/exec",
   "siteUrl": "https://x.com/hagihosyu",
-  "siteLabel": "X.com/萩保守"
+  "siteLabel": "X.com/萩保守",
+  "patrolUsers": [
+    "なかむら",
+    "かみむら",
+    "Aさん",
+    "Bさん",
+    "Cさん"
+  ]
 }

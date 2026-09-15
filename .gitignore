@@ -9,3 +9,7 @@ coord_picker.html
 
 # ローカル確認用サーバー設定
 .claude/
+
+# 会社ごとのデータと組み立て結果（お客さんのデータを公開リポジトリに上げない）
+customers/
+dist/
