@@ -272,11 +272,16 @@
         left: 0; right: 0;
         top: 50%;
         /* 枠の下端 = top50% + 75vw/2 - テキスト高さ */
-        transform: translateY(calc(37.5vw - 32px));
+        transform: translateY(calc(37.5vw - 100%));   /* 2段になっても下端を枠にそろえる */
         background: rgba(0,0,0,0.72);
         padding: 4px 10px;
         z-index: 11;
         pointer-events: none;
+      }
+      #camera-kp-text {
+        display: inline-block;
+        white-space: pre;      /* 落下物は2段目に緯度経度 */
+        line-height: 1.35;
       }
       #camera-kp-overlay span {
         color: #fff;
@@ -669,6 +674,17 @@
         text-align: center;
         margin-top: 2vw;
       }
+      #kp-modal-coord {
+        margin-top: 2vw;
+        text-align: center;
+        font-size: 3.6vw;
+        line-height: 1.6;
+        font-weight: bold;
+        color: #0d5aa7;
+        font-variant-numeric: tabular-nums;
+      }
+      #kp-modal-coord:empty { display: none; }
+      #kp-modal-coord a { color: #0d8f3f; }
       #kp-modal-msg {
         min-height: 4.5vw;
         color: #d32f2f;
@@ -808,6 +824,15 @@
         color: #aab4d4;
         margin-top: 1vw;
       }
+
+      #fs-manual-coord {
+        text-align: center;
+        font-size: 3.4vw;
+        color: #ffd11a;
+        font-variant-numeric: tabular-nums;
+        margin-top: 0.8vw;
+      }
+      #fs-manual-coord:empty { display: none; }
 
       #fall-select-start {
         flex-shrink: 0;          /* 一覧が長くてもボタン自体は縮めない（文字の上下切れ防止） */
@@ -1119,6 +1144,7 @@
           <input id="fs-man-m" type="number" inputmode="numeric" min="0" max="999" placeholder="000" oninput="_fallManualUpdate()">
         </div>
         <div id="fs-manual-msg">メートル（0〜999）を入力してください</div>
+        <div id="fs-manual-coord"></div>
       </div>
 
       <div class="fs-label">車線</div>
@@ -1150,11 +1176,12 @@
       <div id="kp-modal-box">
         <div id="kp-modal-title">距離標を入力して図面を表示</div>
         <div id="kp-input-row">
-          <select id="kp-in-km"></select>
+          <select id="kp-in-km" onchange="_kpModalCoordUpdate()"></select>
           <span class="kp-unit">k</span>
-          <input id="kp-in-m" type="number" inputmode="numeric" min="0" max="999" placeholder="000">
+          <input id="kp-in-m" type="number" inputmode="numeric" min="0" max="999" placeholder="000" oninput="_kpModalCoordUpdate()">
         </div>
         <div id="kp-modal-hint">例：120 k 300 → 120k300 の図面を表示</div>
+        <div id="kp-modal-coord"></div>
         <div id="kp-modal-msg"></div>
         <div id="kp-modal-actions">
           <button id="kp-cancel" onclick="closeKpSearch()">キャンセル</button>
@@ -3786,7 +3813,7 @@
 
         document.getElementById("status").innerHTML = "R191萩保守管内距離標";
         document.getElementById("output").innerHTML =
-          '<div class="e4-version-badge">v3.80-E4</div>' +
+          '<div class="e4-version-badge">v3.81-E4</div>' +
           '<span class="kilo-post">' + displayStatus + '</span>' +
           drawingHtml +
           patrolButtonHtml +
@@ -3797,8 +3824,9 @@
           shareButtonHtml +
           '<a href="' + siteUrl + '" target="_top" class="btn-back">🔗 X.com/萩保守 🔗</a>' +
           '<div class="info-box">' +
-          '<span class="info-title">【いろいろ説明 v3.80-E4】</span>' +         
+          '<span class="info-title">【いろいろ説明 v3.81-E4】</span>' +         
           '・周囲の環境により5～10m以上の誤差が生じる場合があります。<br>' +
+          '・v3.81-E4：距離標を入力すると、その場所の緯度経度を表示します（距離標から図面・トンネル内の手入力）。落下物の写真の下段に緯度経度を入れました。<br>' +
           '・v3.80-E4：落下物の撮影前の画面で、トンネル内などGPSが届かないときに距離標を手入力できるようにしました。道路点検のカメラを広角にしました。<br>' +
           '・v3.79-E4：落下物の種類を変更（動物11種類・物6種類）。写真の文字に撮影月日・時刻と「R7」を追加しました。<br>' +
           '・v3.78-E4：落下物の撮影前に「上り／下り」と種類を選べるようにしました。写真の文字に入ります。<br>' +
@@ -3854,6 +3882,7 @@
       let cameraMode = 'normal'; // 'normal'=通常撮影 / 'patrol'=その他異常(巡回送信) / 'fall'=落下物3枚撮影
       let kpLocked = false;     // 距離標を固定中か
       let lockedKP = null;      // 固定時の距離標
+      let lockedCoord = null;   // 固定時の緯度経度（落下物の写真の2段目に使う）
       let camKpTimer = null;    // 下部テキストのリアルタイム更新タイマー
 
       // 圏外のときは距離標の代わりに緯度経度を付ける（写真の焼き込み・送信用）
@@ -3918,10 +3947,13 @@
         const btn = document.getElementById('btn-lock');
         if (kpLocked) {
           lockedKP = _kpWithCoords(latestKiloPost);   // 押した瞬間の距離標（圏外なら緯度経度）で固定
+          lockedCoord = (currentGpsLat !== null && currentGpsLng !== null)
+            ? { lat: currentGpsLat, lng: currentGpsLng } : null;
           btn.textContent = '解除';
           btn.classList.add('locked');
         } else {
           lockedKP = null;
+          lockedCoord = null;
           btn.textContent = '距離標固定';
           btn.classList.remove('locked');
         }
@@ -3933,6 +3965,7 @@
       function _resetKpLock() {
         kpLocked = false;
         lockedKP = null;
+        lockedCoord = null;
         const btn = document.getElementById('btn-lock');
         if (btn) { btn.textContent = '距離標固定'; btn.classList.remove('locked'); }
       }
@@ -3949,10 +3982,26 @@
           if (fallDirection) mid += '_' + fallDirection;
           if (fallKind)      mid += '_' + fallKind;
           mid += '_' + FALL_STEPS[fallStep];
-          return '--R191_' + _currentKP() + mid + '_' + mdhm + '_R7hagihosyukouji--';
+          // 圏外のときは緯度経度を2段目に出すので、1段目は「圏外」だけにする
+          let kpText = _currentKP();
+          if (/^圏外 /.test(kpText)) kpText = '圏外';
+          const line1 = '--R191_' + kpText + mid + '_' + mdhm + '_R7hagihosyukouji--';
+          const c = _fallCoords();
+          return c ? line1 + '\n(' + c.lat.toFixed(6) + ', ' + c.lng.toFixed(6) + ')' : line1;
         }
         // 通常撮影・その他異常は従来どおり（日時なし）
         return '--R191_' + _currentKP() + '_hagihosyukouji--';
+      }
+
+      // 落下物の写真に入れる緯度経度
+      //   トンネル内の手入力 → その距離標の位置（道路上）
+      //   距離標を固定中     → 固定した瞬間の位置（3枚そろえる）
+      //   それ以外           → いまのGPS
+      function _fallCoords() {
+        if (fallManualKP) return _kpToLatLng(fallManualKP);
+        if (kpLocked && lockedCoord) return lockedCoord;
+        if (currentGpsLat !== null && currentGpsLng !== null) return { lat: currentGpsLat, lng: currentGpsLng };
+        return null;
       }
 
       // 巡回点検「その他異常」用：撮影後にLINE送信モードでカメラを開く
@@ -4065,6 +4114,11 @@
           msg.textContent = fallManualKP ? ('写真には「' + fallManualKP + '」が入ります')
                                          : 'メートル（0〜999）を入力してください';
         }
+        // 手入力した距離標の位置（道路上の緯度経度）を表示
+        const cBox = document.getElementById('fs-manual-coord');
+        const cc = (fallManualOpen && fallManualKP) ? _kpToLatLng(fallManualKP) : null;
+        cBox.textContent = cc ? _coordText(cc)
+                              : ((fallManualOpen && fallManualKP) ? 'この距離標の位置データはありません' : '');
         _fallSelectRefresh();
       }
 
@@ -4327,9 +4381,15 @@
 
         // 写真に焼き込む距離標＝送信・ファイル名にも使う値
         capturedKP = _currentKP();
-        const manualKP = (cameraMode === 'fall' && !!fallManualKP);
-        capturedLat = manualKP ? null : currentGpsLat;
-        capturedLng = manualKP ? null : currentGpsLng;
+        // 落下物は写真に入れる緯度経度と同じ値を記録（1枚目で固定／トンネル内の手入力は距離標から計算）
+        if (cameraMode === 'fall') {
+          const fc = _fallCoords();
+          capturedLat = fc ? fc.lat : null;
+          capturedLng = fc ? fc.lng : null;
+        } else {
+          capturedLat = currentGpsLat;
+          capturedLng = currentGpsLng;
+        }
 
         const OUT_W = 1280;
         const OUT_H = 960;
@@ -4353,18 +4413,21 @@
         ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, OUT_W, OUT_H);
         if (flashed) _flashAfter();
 
-        // 下端に黒帯＋白文字ゴシック1行
-        const overlayText = _getOverlayText();
+        // 下端に黒帯＋白文字ゴシック（落下物は2段：1段目に距離標など、2段目に緯度経度）
+        const overlayLines = _getOverlayText().split('\n');
         const FONT = (px) => `bold ${px}px "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif`;
-        // 圏外時は緯度経度が入って長くなるため、はみ出す場合は自動で縮小
+        // 長い行が写真の幅からはみ出す場合は自動で縮小（全段同じ大きさ）
         let fontSize = 22;
         ctx.font = FONT(fontSize);
         const maxTextW = OUT_W - 28;
-        const measuredW = ctx.measureText(overlayText).width;
+        const measuredW = Math.max.apply(null, overlayLines.map(function(t) { return ctx.measureText(t).width; }));
         if (measuredW > maxTextW) {
           fontSize = Math.max(11, Math.floor(fontSize * maxTextW / measuredW));
         }
-        const bandH   = fontSize + 16;
+        const oneLine = (overlayLines.length === 1);
+        const lineH   = oneLine ? fontSize + 16 : Math.round(fontSize * 1.35);
+        const padY    = oneLine ? 0 : 6;
+        const bandH   = lineH * overlayLines.length + padY * 2;
         const bandY   = OUT_H - bandH;
 
         ctx.fillStyle = 'rgba(0,0,0,0.82)';
@@ -4374,7 +4437,9 @@
         ctx.font = FONT(fontSize);
         ctx.textAlign = 'left';
         ctx.textBaseline = 'middle';
-        ctx.fillText(overlayText, 14, bandY + bandH / 2);
+        overlayLines.forEach(function(t, i) {
+          ctx.fillText(t, 14, bandY + padY + lineH * i + lineH / 2);
+        });
 
         // プレビュー表示に切り替え
         _stopCamKpTimer();   // 撮影値で確定するため更新停止
@@ -4685,6 +4750,59 @@
 
       // ===== 距離標を打ち込んで図面を表示 =====
       // ラベル（例 "120k300" / "111-2k040"）を {prefix, m} に分解
+      // 距離標（例 120k045）から緯度経度を求める。
+      // マスタは約20mおきなので、前後2点の間をメートルで按分する（道路上の位置）
+      function _kpToLatLng(label) {
+        const t = _parseLabel(label);
+        if (!t) return null;
+        const pts = [];
+        MASTER_DATA.forEach(function(p) {
+          const d = _parseLabel(p.label);
+          if (d && d.prefix === t.prefix) pts.push({ m: d.m, lat: p.lat, lng: p.lng });
+        });
+        // 枝番のない km は次の km の k000 を 1000m として足す（120k990 → 120k980〜121k000 の間）
+        if (t.prefix.indexOf('-') < 0) {
+          const next = (parseInt(t.prefix, 10) + 1) + 'k000';
+          const np = MASTER_DATA.find(function(p) { return p.label === next; });
+          if (np) pts.push({ m: 1000, lat: np.lat, lng: np.lng });
+        }
+        if (!pts.length) return null;
+        pts.sort(function(a, b) { return a.m - b.m; });
+        if (t.m < pts[0].m || t.m > pts[pts.length - 1].m) return null;   // データの範囲外
+        for (let i = 0; i < pts.length; i++) {
+          const a = pts[i];
+          if (a.m === t.m) return { lat: a.lat, lng: a.lng };
+          const b = pts[i + 1];
+          if (b && a.m < t.m && t.m < b.m) {
+            const r = (t.m - a.m) / (b.m - a.m);
+            return { lat: a.lat + (b.lat - a.lat) * r, lng: a.lng + (b.lng - a.lng) * r };
+          }
+        }
+        return null;
+      }
+
+      function _coordText(c) {
+        return '緯度 ' + c.lat.toFixed(6) + '　経度 ' + c.lng.toFixed(6);
+      }
+
+      function _mapsUrlOf(c) {
+        return 'https://www.google.com/maps/search/?api=1&query=' + c.lat.toFixed(6) + ',' + c.lng.toFixed(6);
+      }
+
+      // 距離標から図面：入力中の距離標の緯度経度を表示（地図リンク付き）
+      function _kpModalCoordUpdate() {
+        const box = document.getElementById('kp-modal-coord');
+        const km  = document.getElementById('kp-in-km').value;
+        const raw = String(document.getElementById('kp-in-m').value).trim();
+        if (!km || !/^[0-9]{1,3}$/.test(raw)) { box.innerHTML = ''; return; }
+        const label = km + 'k' + raw.padStart(3, '0');
+        const c = _kpToLatLng(label);
+        box.innerHTML = c
+          ? '📍 ' + label + '<br>' + _coordText(c) +
+            '<br><a href="' + _mapsUrlOf(c) + '" target="_blank" rel="noopener">🗺️ 地図で見る</a>'
+          : label + ' の位置データがありません';
+      }
+
       function _parseLabel(label) {
         const m = String(label).match(/^(\d+(?:-\d+)?)k(\d+)$/);
         if (!m) return null;
@@ -4726,6 +4844,7 @@
           document.getElementById('kp-in-m').value = cur.m;
         }
         document.getElementById('kp-modal-msg').textContent = '';
+        _kpModalCoordUpdate();
         document.getElementById('kp-modal').style.display = 'flex';
       }
 
