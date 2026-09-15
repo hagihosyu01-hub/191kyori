@@ -13,7 +13,7 @@
     python tools/publish.py --list                         会社の一覧
 
   会社フォルダ customers/<会社名>/ の中身
-    data/kp.csv          距離標データ（必須）
+    data/kp.csv          距離標データ（必須。1列目 route に路線名。複数路線も1つのファイルでOK）
     data/settings.json   路線名・方面・工事名・送信先・名前など（必須）
     deploy.json          {"project": "kyori-〇〇"}  Cloudflare Pages のプロジェクト名（必須）
     files/               図面画像（map_01.webp など）。サイトの一番上にそのまま置かれます
@@ -133,7 +133,7 @@ def check(name):
         head = [h.strip().lower() for h in rows[0]] if rows else []
         need = [c for c in ('label', 'lat', 'lng') if c not in head]
         if need:
-            errors.append('data/kp.csv の1行目に ' + ', '.join(need) + ' がありません（1行目は label,lat,lng,url,map,x,y）')
+            errors.append('data/kp.csv の1行目に ' + ', '.join(need) + ' がありません（1行目は route,label,lat,lng,url,map,x,y）')
         else:
             iL, iLat, iLng = head.index('label'), head.index('lat'), head.index('lng')
             iMap = head.index('map') if 'map' in head else -1
@@ -379,7 +379,7 @@ SETTINGS_TEMPLATE = {
 MEMO = """{name} の設置メモ
 
 □ data/settings.json の「〇〇」をすべて書き換えた
-□ data/kp.csv に距離標を入れた（Excel可。1行目 label,lat,lng,url,map,x,y）
+□ data/kp.csv に距離標を入れた（Excel可。1行目 route,label,lat,lng,url,map,x,y）
 □ 図面画像を files/ に入れた（kp.csv の map 列の名前と同じにする）
 □ GASを設置して、gasUrl に …/exec のURLを入れた（設置手順書を参照）
 □ python tools/publish.py {name} --check で ✓ 確認OK
@@ -401,7 +401,7 @@ def new(name):
     io.open(os.path.join(base, 'data', 'settings.json'), 'w', encoding='utf-8', newline='').write(
         json.dumps(SETTINGS_TEMPLATE, ensure_ascii=False, indent=2).replace('\n', '\r\n') + '\r\n')
     io.open(os.path.join(base, 'data', 'kp.csv'), 'w', encoding='utf-8-sig', newline='').write(
-        'label,lat,lng,url,map,x,y\r\n')
+        'route,label,lat,lng,url,map,x,y\r\n')
     shutil.copy2(os.path.join(ROOT, 'data', 'README.txt'), os.path.join(base, 'data', 'README.txt'))
     io.open(os.path.join(base, 'deploy.json'), 'w', encoding='utf-8').write(
         json.dumps({'project': project}, ensure_ascii=False, indent=2) + '\n')

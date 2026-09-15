@@ -1,7 +1,9 @@
 このフォルダを差し替えると、別の路線・別の現場で使えます。
 
 ■ kp.csv（距離標データ）
-  1行目は見出し：label,lat,lng,url,map,x,y
+  1行目は見出し：route,label,lat,lng,url,map,x,y
+  route … 路線名（例 R191、R191萩三隅道路、R9）。画面の上と写真の文字に出ます
+          路線ごとに書き分ければ、1つのファイルで複数の路線を扱えます（空欄なら settings.json の routeName）
   label … 距離標（例 120k300、枝番は 111-2k040）。拠点名なども入れられます
   lat   … 緯度（10進数）
   lng   … 経度（10進数）
@@ -12,7 +14,7 @@
   ※距離標は20mおき程度にあると、途中の距離標や緯度経度を正確に計算できます
 
 ■ settings.json（現場の設定）
-  routeName     … 路線名（写真の文字の先頭。例 R191）
+  routeName     … 路線名（kp.csv の route 列が空のときに使う。例 R191）
   areaName      … 管内名（画面の見出し。例 萩保守）
   upDirection   … 上りの行き先（例 下関方面）
   downDirection … 下りの行き先（例 益田方面）

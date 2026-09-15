@@ -145,13 +145,20 @@
         background: #e8590c; color: #fff; font-weight: bold; text-decoration: none; font-size: 4.6vw;
       }
 
-      .e4-version-badge {
-        display: block;
-        margin: 0.2vw auto 1.2vw;
-        color: #a0a4aa;
-        font-size: 2.6vw;
-        font-weight: normal;
-        letter-spacing: 0.04em;
+      /* 路線名（いまいる場所の路線。kp.csv の route 列から） */
+      .route-name-wrap {
+        margin: 0.2vw 0 1.2vw;
+        text-align: center;
+      }
+      .route-name {
+        display: inline-block;
+        padding: 0.6vw 3vw;
+        background: #eef2f7;
+        border-radius: 4vw;
+        color: #2c3e50;
+        font-size: 4vw;
+        font-weight: bold;
+        letter-spacing: 0.02em;
       }
 
       /* 下部の注意書きボックス */
@@ -1299,6 +1306,7 @@
         const col = function(n) { return head.indexOf(n); };
         const iL = col('label'), iLat = col('lat'), iLng = col('lng'), iUrl = col('url');
         const iMap = col('map'), iX = col('x'), iY = col('y');
+        const iRoute = col('route');   // 路線名（無くてもよい。その場合は settings.json の routeName）
         if (iL < 0 || iLat < 0 || iLng < 0) throw new Error('kp.csv の1行目に label,lat,lng が必要です');
         const cell = function(row, i) { return (i >= 0 && row[i] !== undefined) ? String(row[i]).trim() : ''; };
         const out = [];
@@ -1308,7 +1316,7 @@
           const lat = parseFloat(cell(row, iLat));
           const lng = parseFloat(cell(row, iLng));
           if (!label || !isFinite(lat) || !isFinite(lng)) continue;   // 空行・壊れた行は飛ばす
-          const p = { label: label, lat: lat, lng: lng, url: cell(row, iUrl) };
+          const p = { label: label, lat: lat, lng: lng, url: cell(row, iUrl), route: cell(row, iRoute) };
           const map = cell(row, iMap);
           if (map) {
             const x = cell(row, iX), y = cell(row, iY);
@@ -1380,6 +1388,7 @@
       }
 
       let latestKiloPost = "---";
+      let currentRoute = "";     // いまいる場所の路線名（kp.csv の route 列）
 
       window.onload = async function() {
         // 距離標データと現場設定を読み込んでから GPS を開始
@@ -1413,6 +1422,10 @@
         currentGpsLat = lat;
         currentGpsLng = lng;
         const res = calculateNearest(lat, lng);
+        if ((res.route || '') !== currentRoute) {
+          currentRoute = res.route || '';
+          lastDisplayedKP = null;   // 路線が変わったら画面を作り直す
+        }
         showResult(res);
       }
 
@@ -1441,7 +1454,8 @@
           status: resultKP,
           distance: nearest.dist.toFixed(1) + "m",
           drawing: nearest.url,
-          baseMaster: nearest.label
+          baseMaster: nearest.label,
+          route: nearest.route || ''
         };
       }
 
@@ -1556,7 +1570,7 @@
 
         document.getElementById("status").textContent = SETTINGS.routeName + SETTINGS.areaName + "管内距離標";
         document.getElementById("output").innerHTML =
-          '<div class="e4-version-badge">v3.83-E4</div>' +
+          '<div class="route-name-wrap"><span class="route-name">' + _routeName() + '</span></div>' +
           '<span class="kilo-post">' + displayStatus + '</span>' +
           drawingHtml +
           patrolButtonHtml +
@@ -1567,8 +1581,9 @@
           shareButtonHtml +
           (siteUrl ? '<a href="' + siteUrl + '" target="_top" class="btn-back">🔗 ' + (SETTINGS.siteLabel || siteUrl) + ' 🔗</a>' : '') +
           '<div class="info-box">' +
-          '<span class="info-title">【いろいろ説明 v3.83-E4】</span>' +         
+          '<span class="info-title">【いろいろ説明 v3.84-E4】</span>' +         
           '・周囲の環境により5～10m以上の誤差が生じる場合があります。<br>' +
+          '・v3.84-E4：画面の上に、いまいる場所の路線名を表示します（kp.csv の route 列。複数の路線に対応）。<br>' +
           '・v3.83-E4：道路点検で選ぶ名前を data/settings.json（patrolUsers）で変えられるようにしました。新しいURLへの引っ越しに対応しました。<br>' +
           '・v3.82-E4：距離標データと現場の設定を data フォルダに分けました（差し替えると別の路線で使えます）。<br>' +
           '・v3.81-E4：距離標を入力すると、その場所の緯度経度を表示します（距離標から図面・トンネル内の手入力）。落下物の写真の下段に緯度経度を入れました。<br>' +
@@ -1607,10 +1622,10 @@
 
       async function shareKP() {
         let text = latestKiloPost;
-        if (latestKiloPost === "圏外です") text = SETTINGS.routeName + " 圏外" + _locLines();
+        if (latestKiloPost === "圏外です") text = _routeName() + " 圏外" + _locLines();
         try {
           if (navigator.share) {
-            await navigator.share({ title: SETTINGS.routeName + SETTINGS.areaName + "距離標", text: text });
+            await navigator.share({ title: _routeName() + SETTINGS.areaName + "距離標", text: text });
           } else {
             await navigator.clipboard.writeText(text);
             alert("距離標をコピーしました\n\n" + text);
@@ -1641,6 +1656,31 @@
         return String(kp).replace(/圏外/g, 'OOR')
                          .replace(/[^a-zA-Z0-9_.\-]+/g, '_')
                          .replace(/^_+|_+$/g, '');
+      }
+
+      // いまの路線名（kp.csv の route 列。空欄なら settings.json の routeName）
+      function _routeName() {
+        if (cameraMode === 'fall' && fallManualKP) {
+          const r = _routeOfLabel(fallManualKP);   // トンネル内の手入力は、その距離標の路線
+          if (r) return r;
+        }
+        return currentRoute || (SETTINGS && SETTINGS.routeName) || '';
+      }
+
+      // 距離標の番号から路線名を探す
+      function _routeOfLabel(label) {
+        const t = _parseLabel(label);
+        if (!t) return '';
+        for (let i = 0; i < MASTER_DATA.length; i++) {
+          const d = _parseLabel(MASTER_DATA[i].label);
+          if (d && d.prefix === t.prefix && MASTER_DATA[i].route) return MASTER_DATA[i].route;
+        }
+        return '';
+      }
+
+      // ファイル名に使う路線名（ファイル名に使えない文字は _ にする）
+      function _fileRoute() {
+        return _routeName().replace(/[\\\/:*?"<>|\s]+/g, '_');
       }
 
       // 現在有効な距離標（固定中は固定値、それ以外は最新値／圏外なら緯度経度）
@@ -1730,12 +1770,12 @@
           // 圏外のときは緯度経度を2段目に出すので、1段目は「圏外」だけにする
           let kpText = _currentKP();
           if (/^圏外 /.test(kpText)) kpText = '圏外';
-          const line1 = '--' + SETTINGS.routeName + '_' + kpText + mid + '_' + mdhm + '_' + SETTINGS.workNameFall + '--';
+          const line1 = '--' + _routeName() + '_' + kpText + mid + '_' + mdhm + '_' + SETTINGS.workNameFall + '--';
           const c = _fallCoords();
           return c ? line1 + '\n(' + c.lat.toFixed(6) + ', ' + c.lng.toFixed(6) + ')' : line1;
         }
         // 通常撮影・その他異常は従来どおり（日時なし）
-        return '--' + SETTINGS.routeName + '_' + _currentKP() + '_' + SETTINGS.workName + '--';
+        return '--' + _routeName() + '_' + _currentKP() + '_' + SETTINGS.workName + '--';
       }
 
       // 落下物の写真に入れる緯度経度
@@ -2253,14 +2293,14 @@
       async function savePhoto() {
         if (!capturedBlob) return;
         const safeName = _kpFileName(_currentKP());
-        const fileName = SETTINGS.routeName + '_' + safeName + '_' + SETTINGS.fileSuffix + '.jpg';
+        const fileName = _fileRoute() + '_' + safeName + '_' + SETTINGS.fileSuffix + '.jpg';
         const file = new File([capturedBlob], fileName, { type: 'image/jpeg' });
 
         // 共有シート（iOS：「写真に保存」が選べる）
         if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
           try {
             await navigator.share({
-              title: SETTINGS.routeName + SETTINGS.areaName + ' ' + _currentKP(),
+              title: _routeName() + SETTINGS.areaName + ' ' + _currentKP(),
               files: [file]
             });
             return;
@@ -2501,14 +2541,18 @@
         const t = _parseLabel(label);
         if (!t) return null;
         const pts = [];
-        MASTER_DATA.forEach(function(p) {
+        // 同じ路線の点があればそれだけを使う（別路線に同じ番号があっても混ざらない）
+        const sameRoute = currentRoute
+          ? MASTER_DATA.filter(function(p) { return p.route === currentRoute; }) : [];
+        const src = sameRoute.length ? sameRoute : MASTER_DATA;
+        src.forEach(function(p) {
           const d = _parseLabel(p.label);
           if (d && d.prefix === t.prefix) pts.push({ m: d.m, lat: p.lat, lng: p.lng });
         });
         // 枝番のない km は次の km の k000 を 1000m として足す（120k990 → 120k980〜121k000 の間）
         if (t.prefix.indexOf('-') < 0) {
           const next = (parseInt(t.prefix, 10) + 1) + 'k000';
-          const np = MASTER_DATA.find(function(p) { return p.label === next; });
+          const np = src.find(function(p) { return p.label === next; });
           if (np) pts.push({ m: 1000, lat: np.lat, lng: np.lng });
         }
         if (!pts.length) return null;
@@ -3270,7 +3314,7 @@
                 index: i + 1,
                 total: fallShots.length,
                 stage: FALL_STEPS[i],
-                fileName: SETTINGS.routeName + '_' + safeKP + '_' + stamp + '_' + (i + 1) + '_' + FALL_STEPS[i] + '.jpg',
+                fileName: _fileRoute() + '_' + safeKP + '_' + stamp + '_' + (i + 1) + '_' + FALL_STEPS[i] + '.jpg',
                 kp: kp, date: date, time: time, user: user,
                 event: '落下物',
                 direction: fallDirection,
