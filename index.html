@@ -835,6 +835,9 @@
       }
       #fs-man-km { width: 32vw; }
       #fs-man-m  { width: 24vw; }
+      /* 路線が1つだけのときは出さない（複数あるときだけ表示） */
+      #fs-man-route-row { display: none; margin-bottom: 1.5vw; }
+      #fs-man-route { width: 62vw; font-size: 4.4vw; }
       .fs-manual-row .kp-unit { color: #fff; font-size: 6vw; font-weight: bold; }
       #fs-manual-msg {
         text-align: center;
@@ -1156,6 +1159,9 @@
       <div id="fall-select-kp">距離標 ---</div>
       <button id="fs-manual-toggle" onclick="fallManualToggle()">🚇 トンネル内など：距離標を手入力</button>
       <div id="fs-manual">
+        <div class="fs-manual-row" id="fs-man-route-row">
+          <select id="fs-man-route" onchange="_fallManualRouteChange()"></select>
+        </div>
         <div class="fs-manual-row">
           <select id="fs-man-km" onchange="_fallManualUpdate()"></select>
           <span class="kp-unit">k</span>
@@ -1581,8 +1587,9 @@
           shareButtonHtml +
           (siteUrl ? '<a href="' + siteUrl + '" target="_top" class="btn-back">🔗 ' + (SETTINGS.siteLabel || siteUrl) + ' 🔗</a>' : '') +
           '<div class="info-box">' +
-          '<span class="info-title">【いろいろ説明 v3.84-E4】</span>' +         
+          '<span class="info-title">【いろいろ説明 v3.85-E4】</span>' +         
           '・周囲の環境により5～10m以上の誤差が生じる場合があります。<br>' +
+          '・v3.85-E4：スプレッドシートの記録に路線名が入るようになりました。トンネル内の手入力で路線を選べます。<br>' +
           '・v3.84-E4：画面の上に、いまいる場所の路線名を表示します（kp.csv の route 列。複数の路線に対応）。<br>' +
           '・v3.83-E4：道路点検で選ぶ名前を data/settings.json（patrolUsers）で変えられるようにしました。新しいURLへの引っ越しに対応しました。<br>' +
           '・v3.82-E4：距離標データと現場の設定を data フォルダに分けました（差し替えると別の路線で使えます）。<br>' +
@@ -1661,10 +1668,25 @@
       // いまの路線名（kp.csv の route 列。空欄なら settings.json の routeName）
       function _routeName() {
         if (cameraMode === 'fall' && fallManualKP) {
-          const r = _routeOfLabel(fallManualKP);   // トンネル内の手入力は、その距離標の路線
+          // トンネル内の手入力：選んだ路線（選んでいなければ距離標から探す）
+          const r = fallManualRoute || _routeOfLabel(fallManualKP);
           if (r) return r;
         }
         return currentRoute || (SETTINGS && SETTINGS.routeName) || '';
+      }
+
+      // kp.csv に入っている路線名の一覧（出てきた順）
+      function _routeList() {
+        const list = [];
+        MASTER_DATA.forEach(function(p) {
+          if (p.route && list.indexOf(p.route) < 0) list.push(p.route);
+        });
+        return list;
+      }
+
+      // 距離標の計算に使う路線（手入力で選んでいればそれ、無ければ今いる路線）
+      function _activeRoute() {
+        return (fallManualOpen && fallManualRoute) ? fallManualRoute : currentRoute;
       }
 
       // 距離標の番号から路線名を探す
@@ -1805,6 +1827,7 @@
       let fallKind = '';        // FALL_KIND_GROUPS のどれか
       let fallManualOpen = false;   // 距離標の手入力欄を開いているか
       let fallManualKP   = '';      // 手入力した距離標（例 120k045）。空ならGPSの距離標を使う
+      let fallManualRoute = '';     // 手入力のときに選んだ路線名（路線が複数あるとき用）
 
       function openFallSelect() {
         // 毎回あらためて選んでもらう（前回の選択が残って誤記録にならないように）
@@ -1812,6 +1835,7 @@
         fallKind = '';
         fallManualOpen = false;
         fallManualKP = '';
+        fallManualRoute = '';
         document.getElementById('fs-manual').style.display = 'none';
         const mt = document.getElementById('fs-manual-toggle');
         mt.textContent = '🚇 トンネル内など：距離標を手入力';
@@ -1865,22 +1889,55 @@
         btn.classList.toggle('open', fallManualOpen);
         document.getElementById('fs-manual').style.display = fallManualOpen ? 'block' : 'none';
         if (fallManualOpen) {
-          const sel = document.getElementById('fs-man-km');
-          if (!sel.options.length) {
-            _kpPrefixList(true).forEach(function(pref) {
-              const op = document.createElement('option');
-              op.value = pref;
-              op.textContent = pref;
-              sel.appendChild(op);
-            });
-          }
+          const routes = _routeList();
+          const rSel = document.getElementById('fs-man-route');
+          // 路線が1つだけなら選ぶ必要がないので出さない
+          document.getElementById('fs-man-route-row').style.display = (routes.length > 1) ? 'flex' : 'none';
+          rSel.innerHTML = '';
+          routes.forEach(function(r) {
+            const op = document.createElement('option');
+            op.value = r;
+            op.textContent = r;
+            rSel.appendChild(op);
+          });
+          // トンネルに入る前にいた路線を初期値にする（分からなければ先頭）
+          fallManualRoute = (routes.indexOf(currentRoute) >= 0) ? currentRoute : (routes[0] || '');
+          if (fallManualRoute) rSel.value = fallManualRoute;
+          _fillManualKmOptions();
           // トンネルに入る前の距離標があれば、そのkmを初期値にする
+          const sel = document.getElementById('fs-man-km');
           const cur = _parseLabel(latestKiloPost);
-          if (cur) sel.value = cur.prefix;
+          if (cur) {
+            for (let i = 0; i < sel.options.length; i++) {
+              if (sel.options[i].value === cur.prefix) { sel.value = cur.prefix; break; }
+            }
+          }
           const m = document.getElementById('fs-man-m');
           m.value = '';
           setTimeout(function() { m.focus(); }, 50);
+        } else {
+          fallManualRoute = '';
         }
+        _fallManualUpdate();
+      }
+
+      // 選んだ路線の km 一覧を作り直す
+      function _fillManualKmOptions() {
+        const sel = document.getElementById('fs-man-km');
+        sel.innerHTML = '';
+        _kpPrefixList(true, fallManualRoute).forEach(function(pref) {
+          const op = document.createElement('option');
+          op.value = pref;
+          op.textContent = pref;
+          sel.appendChild(op);
+        });
+      }
+
+      // 路線を選び直したら、km の一覧を入れ替えて入力をやり直してもらう
+      function _fallManualRouteChange() {
+        fallManualRoute = document.getElementById('fs-man-route').value;
+        _fillManualKmOptions();
+        document.getElementById('fs-man-m').value = '';
         _fallManualUpdate();
       }
 
@@ -1896,7 +1953,7 @@
           fallManualKP = (km && /^[0-9]{1,3}$/.test(raw)) ? (km + 'k' + raw.padStart(3, '0')) : '';
           kpLine.textContent = fallManualKP ? ('距離標 ' + fallManualKP + '（手入力）')
                                             : '距離標 ---（入力してください）';
-          msg.textContent = fallManualKP ? ('写真には「' + fallManualKP + '」が入ります')
+          msg.textContent = fallManualKP ? ('写真には「' + (fallManualRoute ? fallManualRoute + ' ' : '') + fallManualKP + '」が入ります')
                                          : 'メートル（0〜999）を入力してください';
         }
         // 手入力した距離標の位置（道路上の緯度経度）を表示
@@ -2542,8 +2599,9 @@
         if (!t) return null;
         const pts = [];
         // 同じ路線の点があればそれだけを使う（別路線に同じ番号があっても混ざらない）
-        const sameRoute = currentRoute
-          ? MASTER_DATA.filter(function(p) { return p.route === currentRoute; }) : [];
+        const rt = _activeRoute();
+        const sameRoute = rt
+          ? MASTER_DATA.filter(function(p) { return p.route === rt; }) : [];
         const src = sameRoute.length ? sameRoute : MASTER_DATA;
         src.forEach(function(p) {
           const d = _parseLabel(p.label);
@@ -2599,10 +2657,11 @@
       }
 
       // 図面を持つ距離標の「km（枝番含む）」一覧
-      function _kpPrefixList(all) {
+      function _kpPrefixList(all, route) {
         const list = [];
         MASTER_DATA.forEach(function(p) {
           if (!all && !p.map) return;
+          if (route && p.route !== route) return;   // 路線を指定されたら、その路線だけ
           const d = _parseLabel(p.label);
           if (d && list.indexOf(d.prefix) < 0) list.push(d.prefix);
         });
@@ -2877,6 +2936,7 @@
             body: JSON.stringify({
               type: 'line',
               message: msg,
+              route: _routeName(),
               kp, event: eventName, date, time, user: patrolUser
             })
           });
@@ -2920,6 +2980,7 @@
         capturedLng = null;
         fallManualOpen = false;
         fallManualKP = '';
+        fallManualRoute = '';
         const modal = document.getElementById('camera-modal');
         modal.style.display = 'none';
         document.body.appendChild(modal);
@@ -2969,6 +3030,7 @@
             body: JSON.stringify({
               type: 'line_image',
               message: msg,
+              route: _routeName(),
               kp, event: 'その他異常', date, time, user,
               image: base64, mimeType: 'image/jpeg'
             })
@@ -3315,6 +3377,7 @@
                 total: fallShots.length,
                 stage: FALL_STEPS[i],
                 fileName: _fileRoute() + '_' + safeKP + '_' + stamp + '_' + (i + 1) + '_' + FALL_STEPS[i] + '.jpg',
+                route: _routeName(),
                 kp: kp, date: date, time: time, user: user,
                 event: '落下物',
                 direction: fallDirection,
