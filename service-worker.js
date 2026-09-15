@@ -1,8 +1,10 @@
-const CACHE_NAME = 'r191-kp-v4';
+const CACHE_NAME = 'r191-kp-v5';
 const ASSETS = [
   'index.html',
   'manifest.json',
-  'icon-192.png'
+  'icon-192.png',
+  'data/kp.csv',
+  'data/settings.json'
 ];
 
 // インストール時に基本ファイルをキャッシュ
@@ -55,6 +57,21 @@ self.addEventListener('fetch', (e) => {
         caches.open(CACHE_NAME).then((c) => c.put(req, copy));
         return res;
       }).catch(() => caches.match(req).then((c) => c || caches.match('index.html')))
+    );
+    return;
+  }
+
+  // 距離標データ・現場設定（data/）はネットワーク優先で、取れたらキャッシュを更新。
+  // 圏外のときは前回のキャッシュを使う。
+  if (req.url.indexOf('/data/') >= 0) {
+    e.respondWith(
+      fetch(req).then((res) => {
+        if (res.ok) {
+          const copy = res.clone();
+          caches.open(CACHE_NAME).then((c) => c.put(req, copy));
+        }
+        return res;
+      }).catch(() => caches.match(req, { ignoreSearch: true }))
     );
     return;
   }
