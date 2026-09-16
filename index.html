@@ -1452,9 +1452,19 @@
 
         points.sort((a, b) => a.dist - b.dist);
         const nearest = points[0];
-        const second = points[1] || nearest;
+        // 2点目は同じ路線から選ぶ（別路線の点と混ざると距離標の計算がずれるため）
+        let second = nearest;
+        for (let i = 1; i < points.length; i++) {
+          if (points[i].route === nearest.route) { second = points[i]; break; }
+        }
+        if (second === nearest && points.length > 1) second = points[1];
 
-        let resultKP = (nearest.dist > 50) ? "圏外です" : getInterpolatedKP(nearest, second, lat, lng);
+        // 圏外の判定：距離標の間隔に合わせる
+        //   20mおきの区間は今までどおり50m、100mおきの区間は70mまで道路上とみなす（上限100m）
+        const spacing = calculateDistance(nearest.lat, nearest.lng, second.lat, second.lng);
+        const limit = Math.min(100, Math.max(50, spacing * 0.7));
+
+        let resultKP = (nearest.dist > limit) ? "圏外です" : getInterpolatedKP(nearest, second, lat, lng);
 
         return {
           status: resultKP,
@@ -1587,8 +1597,9 @@
           shareButtonHtml +
           (siteUrl ? '<a href="' + siteUrl + '" target="_top" class="btn-back">🔗 ' + (SETTINGS.siteLabel || siteUrl) + ' 🔗</a>' : '') +
           '<div class="info-box">' +
-          '<span class="info-title">【いろいろ説明 v3.85-E4】</span>' +         
+          '<span class="info-title">【いろいろ説明 v3.86-E4】</span>' +         
           '・周囲の環境により5～10m以上の誤差が生じる場合があります。<br>' +
+          '・v3.86-E4：R191の山口県内全線と萩三隅道路の距離標を追加しました（100mおき）。<br>' +
           '・v3.85-E4：スプレッドシートの記録に路線名が入るようになりました。トンネル内の手入力で路線を選べます。<br>' +
           '・v3.84-E4：画面の上に、いまいる場所の路線名を表示します（kp.csv の route 列。複数の路線に対応）。<br>' +
           '・v3.83-E4：道路点検で選ぶ名前を data/settings.json（patrolUsers）で変えられるようにしました。新しいURLへの引っ越しに対応しました。<br>' +
