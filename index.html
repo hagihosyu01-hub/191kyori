@@ -1584,7 +1584,8 @@
         kpSearchButtonHtml = '<button onclick="openKpSearch()" class="btn-kpsearch">🔢 距離標から図面 🔢</button>';
         shareButtonHtml = '<button onclick="shareKP()" class="btn-share">📤 距離標のコピペ 📤</button>';
 
-        document.getElementById("status").textContent = SETTINGS.routeName + SETTINGS.areaName + "管内距離標";
+        // 路線名はすぐ下に出るので、見出しは管内名だけ（管内名は data/settings.json の areaName）
+        document.getElementById("status").textContent = SETTINGS.areaName + "管内距離標";
         document.getElementById("output").innerHTML =
           '<div class="route-name-wrap"><span class="route-name">' + _routeName() + '</span></div>' +
           '<span class="kilo-post">' + displayStatus + '</span>' +
@@ -1597,8 +1598,9 @@
           shareButtonHtml +
           (siteUrl ? '<a href="' + siteUrl + '" target="_top" class="btn-back">🔗 ' + (SETTINGS.siteLabel || siteUrl) + ' 🔗</a>' : '') +
           '<div class="info-box">' +
-          '<span class="info-title">【いろいろ説明 v3.86-E4】</span>' +         
+          '<span class="info-title">【いろいろ説明 v3.87-E4】</span>' +         
           '・周囲の環境により5～10m以上の誤差が生じる場合があります。<br>' +
+          '・v3.87-E4：見出しを「〇〇管内距離標」にしました（路線名はすぐ下に出ます）。<br>' +
           '・v3.86-E4：R191の山口県内全線と萩三隅道路の距離標を追加しました（100mおき）。<br>' +
           '・v3.85-E4：スプレッドシートの記録に路線名が入るようになりました。トンネル内の手入力で路線を選べます。<br>' +
           '・v3.84-E4：画面の上に、いまいる場所の路線名を表示します（kp.csv の route 列。複数の路線に対応）。<br>' +
