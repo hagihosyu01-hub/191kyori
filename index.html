@@ -145,6 +145,25 @@
         background: #e8590c; color: #fff; font-weight: bold; text-decoration: none; font-size: 4.6vw;
       }
 
+      /* 古いURLで開いたときのお知らせ画面（距離標は出さない） */
+      #moved-page {
+        width: 87.5vw; margin: 4vw auto; padding: 6vw 5vw; box-sizing: border-box;
+        background: #fff; border: 0.375vw solid #f0ad4e; border-radius: 1.875vw;
+        box-shadow: 0 0.5vw 1.25vw rgba(0,0,0,0.1); color: #333;
+      }
+      #moved-page .mp-icon { font-size: 12vw; line-height: 1.2; }
+      #moved-page h1 { font-size: 6.25vw; margin: 2vw 0 4vw; color: #5a4400; }
+      #moved-page p { font-size: 4.2vw; line-height: 1.7; margin: 0 0 5vw; }
+      #moved-page .mp-btn {
+        display: inline-block; padding: 3.5vw 8vw; border-radius: 2.5vw;
+        background: #e8590c; color: #fff; font-weight: bold; text-decoration: none; font-size: 5.6vw;
+      }
+      #moved-page .mp-url { margin-top: 3vw; font-size: 3.6vw; color: #666; word-break: break-all; }
+      #moved-page .mp-steps {
+        margin-top: 6vw; padding: 4vw; text-align: left; background: #f4f7f6; border-radius: 1.5vw;
+        font-size: 3.8vw; line-height: 1.8; color: #444;
+      }
+
       /* 路線名（いまいる場所の路線。kp.csv の route 列から） */
       .route-name-wrap {
         margin: 0.2vw 0 1.2vw;
@@ -1371,6 +1390,43 @@
         document.body.insertBefore(d, document.body.firstChild);
       }
 
+      // 引っ越し前の古いURLで開かれたか（movedTo と違う場所。自分のパソコンでの確認 localhost は除く）
+      function _isMovedAway() {
+        const to = SETTINGS && SETTINGS.movedTo;
+        if (!to) return false;
+        let dest;
+        try { dest = new URL(to, location.href); } catch (e) { return false; }
+        if (dest.origin === location.origin) return false;
+        if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) return false;
+        return true;
+      }
+
+      // 古いURLでは距離標を出さず、引っ越しのお知らせだけを表示する
+      function _showMovedPage() {
+        const dest = new URL(SETTINGS.movedTo, location.href);
+        document.body.innerHTML = '';
+        const page = document.createElement('div');
+        page.id = 'moved-page';
+        page.innerHTML =
+          '<div class="mp-icon">📢</div>' +
+          '<h1>アプリの住所が変わりました</h1>' +
+          '<p>このアプリは新しい住所に引っ越しました。<br>下のボタンから新しいアプリを開いて、<br>ホーム画面に追加し直してください。</p>' +
+          '<a class="mp-btn"></a>' +
+          '<div class="mp-url"></div>' +
+          '<div class="mp-steps">' +
+            '<b>ホーム画面への追加のしかた</b><br>' +
+            'iPhone：Safari の「共有」→「ホーム画面に追加」<br>' +
+            'Android：Chrome の「︙」→「ホーム画面に追加」<br>' +
+            '追加できたら、この古いアイコンは長押しして削除してください。' +
+          '</div>';
+        const a = page.querySelector('.mp-btn');
+        a.href = dest.href;
+        a.textContent = '新しいアプリを開く';
+        page.querySelector('.mp-url').textContent = dest.href;
+        document.body.appendChild(page);
+        document.title = 'アプリの住所が変わりました';
+      }
+
       // 画面の固定文言に設定を反映
       function _applySettingsToDom() {
         const S = SETTINGS;
@@ -1401,7 +1457,8 @@
         document.getElementById('status').textContent = '距離標データを読み込み中...';
         try {
           await loadRouteData();
-          getLocation();
+          // 古いURLで開かれたときは距離標を出さず、引っ越しのお知らせだけにする（位置情報も使わない）
+          if (_isMovedAway()) { _showMovedPage(); } else { getLocation(); }
         } catch (e) {
           document.getElementById('status').innerHTML =
             '<span style="color:red; font-weight:bold;">距離標データを読み込めません</span><br>' + e.message;
@@ -1599,8 +1656,9 @@
           shareButtonHtml +
           (siteUrl ? '<a href="' + siteUrl + '" target="_top" class="btn-back">🔗 ' + (SETTINGS.siteLabel || siteUrl) + ' 🔗</a>' : '') +
           '<div class="info-box">' +
-          '<span class="info-title">【いろいろ説明 v3.89-E4】</span>' +         
+          '<span class="info-title">【いろいろ説明 v3.90-E4】</span>' +         
           '・周囲の環境により5～10m以上の誤差が生じる場合があります。<br>' +
+          '・v3.90-E4：古いURLで開いたときは、引っ越しのお知らせだけを表示します。<br>' +
           '・v3.89-E4：圏外のときは、見出しの下の路線名を「ーー」と表示します。<br>' +
           '・v3.88-E4：国道9号（535k200〜592k500）の距離標を追加しました（100mおき）。<br>' +
           '・v3.87-E4：見出しを「〇〇管内距離標」にしました（路線名はすぐ下に出ます）。<br>' +
