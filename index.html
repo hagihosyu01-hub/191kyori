@@ -1587,7 +1587,8 @@
         // 路線名はすぐ下に出るので、見出しは管内名だけ（管内名は data/settings.json の areaName）
         document.getElementById("status").textContent = SETTINGS.areaName + "管内距離標";
         document.getElementById("output").innerHTML =
-          '<div class="route-name-wrap"><span class="route-name">' + _routeName() + '</span></div>' +
+          // 圏外のときは近くに路線が無いので、路線名の代わりに「ーー」を出す
+          '<div class="route-name-wrap"><span class="route-name">' + (res.status === "圏外です" ? 'ーー' : _routeName()) + '</span></div>' +
           '<span class="kilo-post">' + displayStatus + '</span>' +
           drawingHtml +
           patrolButtonHtml +
@@ -1598,8 +1599,9 @@
           shareButtonHtml +
           (siteUrl ? '<a href="' + siteUrl + '" target="_top" class="btn-back">🔗 ' + (SETTINGS.siteLabel || siteUrl) + ' 🔗</a>' : '') +
           '<div class="info-box">' +
-          '<span class="info-title">【いろいろ説明 v3.88-E4】</span>' +         
+          '<span class="info-title">【いろいろ説明 v3.89-E4】</span>' +         
           '・周囲の環境により5～10m以上の誤差が生じる場合があります。<br>' +
+          '・v3.89-E4：圏外のときは、見出しの下の路線名を「ーー」と表示します。<br>' +
           '・v3.88-E4：国道9号（535k200〜592k500）の距離標を追加しました（100mおき）。<br>' +
           '・v3.87-E4：見出しを「〇〇管内距離標」にしました（路線名はすぐ下に出ます）。<br>' +
           '・v3.86-E4：R191の山口県内全線と萩三隅道路の距離標を追加しました（100mおき）。<br>' +
