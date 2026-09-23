@@ -995,45 +995,73 @@
         display: none;
         flex-direction: column;
         flex: 1;
-        padding: 2vw;
+        padding: 3vw 4vw 4vw;
         gap: 2vw;
-        background: #fff;
+        background: #1a1a2e;
+        color: #fff;
+        overflow: hidden;
+        box-sizing: border-box;
       }
-      #patrol-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 2vw;
-        flex: 1;
+      /* 選択する部分（項目が多いのでここだけ縦にスクロールする） */
+      #pt-scroll { flex: 1; overflow-y: auto; }
+      /* トンネル内など：距離標の手入力 */
+      #pt-manual-toggle {
+        display: block;
+        margin: 0 auto 1vw;
+        padding: 2vw 3.5vw;
+        font-size: 3.6vw;
+        font-weight: bold;
+        border-radius: 5vw;
+        border: 1.5px dashed #aab4d4;
+        background: transparent;
+        color: #dfe5f5;
+        cursor: pointer;
       }
-      .patrol-evt-btn {
+      #pt-manual-toggle.open { border-style: solid; border-color: #ffd11a; color: #ffd11a; }
+      #pt-manual {
+        display: none;
+        margin-top: 1.5vw;
+        padding: 2vw 3vw;
+        border-radius: 3vw;
+        background: #16213e;
+        border: 2px solid #ffd11a;
+      }
+      /* 路線が1つだけのときは出さない */
+      #pt-man-route-row { display: none; margin-bottom: 1.5vw; }
+      #pt-man-route { width: 62vw; font-size: 4.4vw; }
+      #pt-man-km { width: 32vw; }
+      #pt-man-m  { width: 24vw; }
+      #pt-manual-msg {
+        text-align: center;
+        font-size: 3.2vw;
+        color: #aab4d4;
+        margin-top: 1vw;
+      }
+      #pt-manual-coord {
+        text-align: center;
+        font-size: 3.4vw;
+        color: #ffd11a;
+        font-variant-numeric: tabular-nums;
+        margin-top: 0.8vw;
+      }
+      #pt-manual-coord:empty { display: none; }
+      /* 撮影開始ボタン */
+      #patrol-start {
+        flex-shrink: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        padding: 3.2vw 3vw;
+        font-size: 5vw;
+        font-weight: bold;
         border: none;
         border-radius: 3vw;
+        background: #e67e22;
+        color: #fff;
         cursor: pointer;
-        background: #fff;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 1.5vw;
-        padding: 3vw 2vw;
-        transition: transform 0.1s, opacity 0.1s;
+        box-shadow: 0 0.5vw 1.5vw rgba(0,0,0,0.25);
       }
-      .patrol-evt-btn:active {
-        transform: scale(0.95);
-        opacity: 0.8;
-      }
-      .patrol-evt-btn img {
-        width: 72%;
-        aspect-ratio: 1 / 1;
-        object-fit: contain;
-      }
-      .patrol-evt-label {
-        color: #222;
-        font-size: 4.2vw;
-        font-weight: bold;
-        text-align: center;
-        line-height: 1.3;
-      }
+      #patrol-start:disabled { background: #555a70; color: #c8ccd8; box-shadow: none; }
+      #patrol-start:active:not(:disabled) { background: #cf6f1c; transform: scale(0.98); }
       #patrol-change-user {
         background: none;
         border: 1px solid #444;
@@ -1045,20 +1073,6 @@
         align-self: center;
         flex-shrink: 0;
       }
-      /* その他異常（写真撮影→送信）ボタン */
-      #patrol-other-btn {
-        background: #e67e22;
-        border: none;
-        color: #fff;
-        font-size: 4.6vw;
-        font-weight: bold;
-        padding: 3.2vw 3vw;
-        border-radius: 3vw;
-        cursor: pointer;
-        flex-shrink: 0;
-        box-shadow: 0 0.5vw 1.5vw rgba(0,0,0,0.25);
-      }
-      #patrol-other-btn:active { background: #cf6f1c; transform: scale(0.98); }
       /* 黄色い車アイコン（絵文字🚗の代わり） */
       .car-ico { width: 1.15em; height: 1.15em; vertical-align: -0.22em; }
       /* 赤いピンマークアイコン */
@@ -1135,35 +1149,33 @@
         <button class="patrol-name-btn" onclick="patrolSelectUser('Cさん')">Cさん</button>
       </div>
 
-      <!-- 事象ボタンレイヤー -->
+      <!-- 名前のあと：手入力・車線・異常項目を選ぶ画面 -->
       <div id="patrol-event-layer">
-        <div id="patrol-grid">
-          <button class="patrol-evt-btn" onclick="patrolSend('ポットホール')">
-            <img src="patrol_pothole.png" alt="ポットホール">
-            <span class="patrol-evt-label">ポットホール</span>
-          </button>
-          <button class="patrol-evt-btn" onclick="patrolSend('路肩堆積物')">
-            <img src="patrol_debris.png" alt="路肩堆積物">
-            <span class="patrol-evt-label">路肩堆積物</span>
-          </button>
-          <button class="patrol-evt-btn" onclick="patrolSend('通行支障木')">
-            <img src="patrol_tree-road.png" alt="通行支障木">
-            <span class="patrol-evt-label">通行支障木</span>
-          </button>
-          <button class="patrol-evt-btn" onclick="patrolSend('視認支障木')">
-            <img src="patrol_tree-sight.png" alt="視認支障木">
-            <span class="patrol-evt-label">視認支障木</span>
-          </button>
-          <button class="patrol-evt-btn" onclick="patrolSend('防護柵等異常')">
-            <img src="patrol_guardrail.png" alt="防護柵等異常">
-            <span class="patrol-evt-label">防護柵等異常</span>
-          </button>
-          <button class="patrol-evt-btn" onclick="patrolSend('照明異常')">
-            <img src="patrol_light.png" alt="照明異常">
-            <span class="patrol-evt-label">照明異常</span>
-          </button>
+        <div id="pt-scroll">
+          <button id="pt-manual-toggle" onclick="patrolManualToggle()">🚇 トンネル内など：距離標を手入力</button>
+          <div id="pt-manual">
+            <div class="fs-manual-row" id="pt-man-route-row">
+              <select id="pt-man-route" onchange="_patrolManualRouteChange()"></select>
+            </div>
+            <div class="fs-manual-row">
+              <select id="pt-man-km" onchange="_patrolManualUpdate()"></select>
+              <span class="kp-unit">k</span>
+              <input id="pt-man-m" type="number" inputmode="numeric" min="0" max="999" placeholder="000" oninput="_patrolManualUpdate()">
+            </div>
+            <div id="pt-manual-msg">メートル（0〜999）を入力してください</div>
+            <div id="pt-manual-coord"></div>
+          </div>
+
+          <div class="fs-label">車線</div>
+          <div class="fs-row" id="pt-dir">
+            <button class="fs-btn" data-v="下り" onclick="patrolPick('dir', this)"><small class="dir-name-down">（益田方面）</small><span class="dir-main">↑下り</span><small class="dir-name-up">（下関方面）</small></button>
+            <button class="fs-btn" data-v="上り" onclick="patrolPick('dir', this)"><small class="dir-name-down">（益田方面）</small><span class="dir-main">↓上り</span><small class="dir-name-up">（下関方面）</small></button>
+          </div>
+
+          <div class="fs-label">異常項目</div>
+          <div id="pt-kind" class="fs-grid"></div>
         </div>
-        <button id="patrol-other-btn" onclick="openPatrolCamera()">📷 その他異常（写真を撮って送信）</button>
+        <button id="patrol-start" onclick="patrolSelectStart()" disabled>車線と異常項目を選んでください</button>
         <button id="patrol-change-user" onclick="patrolChangeUser()">▶ 名前を変更</button>
       </div>
     </div>
@@ -1656,8 +1668,9 @@
           shareButtonHtml +
           (siteUrl ? '<a href="' + siteUrl + '" target="_top" class="btn-back">🔗 ' + (SETTINGS.siteLabel || siteUrl) + ' 🔗</a>' : '') +
           '<div class="info-box">' +
-          '<span class="info-title">【いろいろ説明 v3.91-E4】</span>' +         
+          '<span class="info-title">【いろいろ説明 v3.92-E4】</span>' +         
           '・周囲の環境により5～10m以上の誤差が生じる場合があります。<br>' +
+          '・v3.92-E4：道路点検を「車線・異常項目（16種類）を選んでから撮影」に変えました。トンネル内の手入力もできます。<br>' +
           '・v3.91-E4：191号の73k800〜101k900と145k400〜146k200の位置を図面PDFの値に更新し、114k100の位置の誤りを直しました。<br>' +
           '・v3.90-E4：古いURLで開いたときは、引っ越しのお知らせだけを表示します。<br>' +
           '・v3.89-E4：圏外のときは、見出しの下の路線名を「ーー」と表示します。<br>' +
@@ -1747,6 +1760,10 @@
           const r = fallManualRoute || _routeOfLabel(fallManualKP);
           if (r) return r;
         }
+        if (cameraMode === 'patrol' && patrolManualKP) {
+          const r = patrolManualRoute || _routeOfLabel(patrolManualKP);
+          if (r) return r;
+        }
         return currentRoute || (SETTINGS && SETTINGS.routeName) || '';
       }
 
@@ -1761,7 +1778,9 @@
 
       // 距離標の計算に使う路線（手入力で選んでいればそれ、無ければ今いる路線）
       function _activeRoute() {
-        return (fallManualOpen && fallManualRoute) ? fallManualRoute : currentRoute;
+        if (fallManualOpen && fallManualRoute) return fallManualRoute;
+        if (patrolManualOpen && patrolManualRoute) return patrolManualRoute;
+        return currentRoute;
       }
 
       // 距離標の番号から路線名を探す
@@ -1782,8 +1801,9 @@
 
       // 現在有効な距離標（固定中は固定値、それ以外は最新値／圏外なら緯度経度）
       function _currentKP() {
-        // 落下物でトンネル内などの手入力があれば、それを最優先
+        // トンネル内などの手入力があれば、それを最優先
         if (cameraMode === 'fall' && fallManualKP) return fallManualKP;
+        if (cameraMode === 'patrol' && patrolManualKP) return patrolManualKP;
         return (kpLocked && lockedKP !== null) ? lockedKP : _kpWithCoords(latestKiloPost);
       }
 
@@ -2936,6 +2956,21 @@
       let patrolUser = '';
       let patrolClockTimer = null;
 
+      // 道路点検の異常項目
+      const PATROL_KINDS = [
+        'ポットホール', '路面損傷', '段差',
+        '路肩堆積', '倒木', '通行支障木',
+        '視認支障木', '土砂・落石', '法面異常',
+        '排水異常', '側溝蓋等異常', '防護柵異常',
+        'デリネータ等異常', '標識異常', '照明異常',
+        'その他異常'
+      ];
+      let patrolDirection = '';      // '上り' | '下り'
+      let patrolKind = '';           // PATROL_KINDS のどれか
+      let patrolManualOpen = false;  // 距離標の手入力欄を開いているか
+      let patrolManualKP = '';       // 手入力した距離標（空ならGPSの距離標）
+      let patrolManualRoute = '';    // 手入力のときに選んだ路線名
+
       function openPatrol() {
         const modal = document.getElementById('patrol-modal');
         modal.style.display = 'flex';
@@ -2974,6 +3009,138 @@
         document.getElementById('patrol-event-layer').style.display = 'flex';
         // KPを最新に更新
         document.getElementById('patrol-kp').textContent = latestKiloPost || '---';
+
+        // 毎回あらためて選んでもらう（前回の選択が残って誤記録にならないように）
+        patrolDirection = '';
+        patrolKind = '';
+        patrolManualOpen = false;
+        patrolManualKP = '';
+        patrolManualRoute = '';
+        document.getElementById('pt-manual').style.display = 'none';
+        const mt = document.getElementById('pt-manual-toggle');
+        mt.textContent = '🚇 トンネル内など：距離標を手入力';
+        mt.classList.remove('open');
+        document.querySelectorAll('#pt-dir .fs-btn, #pt-kind .fs-btn').forEach(function(b) { b.classList.remove('sel'); });
+
+        // 異常項目のボタン（初回だけ作る）
+        const box = document.getElementById('pt-kind');
+        if (!box.children.length) {
+          PATROL_KINDS.forEach(function(k) {
+            const b = document.createElement('button');
+            b.className = 'fs-btn' + (k.length >= 6 ? ' fs-long' : '');
+            b.dataset.v = k;
+            b.textContent = k;
+            b.addEventListener('click', function() { patrolPick('kind', b); });
+            box.appendChild(b);
+          });
+        }
+        document.getElementById('pt-scroll').scrollTop = 0;
+        _patrolSelectRefresh();
+      }
+
+      // 車線・異常項目を選ぶ
+      function patrolPick(group, btn) {
+        const box = (group === 'dir') ? document.getElementById('pt-dir') : document.getElementById('pt-kind');
+        box.querySelectorAll('.fs-btn').forEach(function(b) { b.classList.remove('sel'); });
+        btn.classList.add('sel');
+        if (group === 'dir') patrolDirection = btn.dataset.v;
+        else                 patrolKind      = btn.dataset.v;
+        _patrolSelectRefresh();
+      }
+
+      // トンネル内などGPSが届かないとき用：距離標を手で入れる
+      function patrolManualToggle() {
+        patrolManualOpen = !patrolManualOpen;
+        const btn = document.getElementById('pt-manual-toggle');
+        btn.textContent = patrolManualOpen ? '↩ GPSの距離標に戻す' : '🚇 トンネル内など：距離標を手入力';
+        btn.classList.toggle('open', patrolManualOpen);
+        document.getElementById('pt-manual').style.display = patrolManualOpen ? 'block' : 'none';
+        if (patrolManualOpen) {
+          const routes = _routeList();
+          const rSel = document.getElementById('pt-man-route');
+          document.getElementById('pt-man-route-row').style.display = (routes.length > 1) ? 'flex' : 'none';
+          rSel.innerHTML = '';
+          routes.forEach(function(r) {
+            const op = document.createElement('option');
+            op.value = r;
+            op.textContent = r;
+            rSel.appendChild(op);
+          });
+          patrolManualRoute = (routes.indexOf(currentRoute) >= 0) ? currentRoute : (routes[0] || '');
+          if (patrolManualRoute) rSel.value = patrolManualRoute;
+          _fillPatrolKmOptions();
+          const sel = document.getElementById('pt-man-km');
+          const cur = _parseLabel(latestKiloPost);
+          if (cur) {
+            for (let i = 0; i < sel.options.length; i++) {
+              if (sel.options[i].value === cur.prefix) { sel.value = cur.prefix; break; }
+            }
+          }
+          const m = document.getElementById('pt-man-m');
+          m.value = '';
+          setTimeout(function() { m.focus(); }, 50);
+        } else {
+          patrolManualRoute = '';
+        }
+        _patrolManualUpdate();
+      }
+
+      function _fillPatrolKmOptions() {
+        const sel = document.getElementById('pt-man-km');
+        sel.innerHTML = '';
+        _kpPrefixList(true, patrolManualRoute).forEach(function(pref) {
+          const op = document.createElement('option');
+          op.value = pref;
+          op.textContent = pref;
+          sel.appendChild(op);
+        });
+      }
+
+      function _patrolManualRouteChange() {
+        patrolManualRoute = document.getElementById('pt-man-route').value;
+        _fillPatrolKmOptions();
+        document.getElementById('pt-man-m').value = '';
+        _patrolManualUpdate();
+      }
+
+      function _patrolManualUpdate() {
+        const msg = document.getElementById('pt-manual-msg');
+        if (!patrolManualOpen) {
+          patrolManualKP = '';
+        } else {
+          const km  = document.getElementById('pt-man-km').value;
+          const raw = document.getElementById('pt-man-m').value.trim();
+          patrolManualKP = (km && /^[0-9]{1,3}$/.test(raw)) ? (km + 'k' + raw.padStart(3, '0')) : '';
+          msg.textContent = patrolManualKP
+            ? ('写真と記録には「' + (patrolManualRoute ? patrolManualRoute + ' ' : '') + patrolManualKP + '」が入ります')
+            : 'メートル（0〜999）を入力してください';
+        }
+        const cBox = document.getElementById('pt-manual-coord');
+        const cc = (patrolManualOpen && patrolManualKP) ? _kpToLatLng(patrolManualKP) : null;
+        cBox.textContent = cc ? _coordText(cc)
+                              : ((patrolManualOpen && patrolManualKP) ? 'この距離標の位置データはありません' : '');
+        document.getElementById('patrol-kp').textContent =
+          patrolManualKP ? (patrolManualKP + '（手入力）') : (latestKiloPost || '---');
+        _patrolSelectRefresh();
+      }
+
+      function _patrolSelectRefresh() {
+        const start = document.getElementById('patrol-start');
+        if (!start) return;
+        const selOk = !!(patrolDirection && patrolKind);
+        const kpOk  = !patrolManualOpen || !!patrolManualKP;
+        start.disabled = !(selOk && kpOk);
+        start.textContent = !selOk ? '車線と異常項目を選んでください'
+                          : !kpOk  ? '距離標を入力してください'
+                          : '📷 撮影開始（' + patrolDirection + '／' + patrolKind + '）';
+        _fitStartButton(start);
+      }
+
+      function patrolSelectStart() {
+        if (!patrolDirection || !patrolKind) return;
+        if (patrolManualOpen && !patrolManualKP) return;
+        closePatrol();
+        openCamera('patrol');
       }
 
       function patrolStartClock() {
@@ -2983,42 +3150,12 @@
           const h = String(now.getHours()).padStart(2,'0');
           const m = String(now.getMinutes()).padStart(2,'0');
           document.getElementById('patrol-time').textContent = h + ':' + m;
-          // 距離標もリアルタイム更新（移動に追従）
+          // 距離標もリアルタイム更新（移動に追従。手入力中はその値のまま）
           const kpEl = document.getElementById('patrol-kp');
-          if (kpEl) kpEl.textContent = latestKiloPost || '---';
+          if (kpEl) kpEl.textContent = patrolManualKP ? (patrolManualKP + '（手入力）') : (latestKiloPost || '---');
         }
         tick();
         patrolClockTimer = setInterval(tick, 1000);
-      }
-
-      async function patrolSend(eventName) {
-        const kp   = latestKiloPost || '不明';
-        const now  = new Date();
-        const date = now.getFullYear() + '/' +
-          String(now.getMonth()+1).padStart(2,'0') + '/' +
-          String(now.getDate()).padStart(2,'0');
-        const time = String(now.getHours()).padStart(2,'0') + ':' +
-          String(now.getMinutes()).padStart(2,'0');
-
-        const msg = `📍 ${kp}\n⚠️ ${eventName}\n🕐 ${date} ${time}\n👤 ${patrolUser}` + _locLines();
-
-        patrolToast('📡 送信中...', '');
-        try {
-          await fetch(PATROL_GAS_URL, {
-            method: 'POST',
-            mode: 'no-cors',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              type: 'line',
-              message: msg,
-              route: _routeName(),
-              kp, event: eventName, date, time, user: patrolUser
-            })
-          });
-          patrolToast('✅ 送信しました', 'ok');
-        } catch(e) {
-          patrolToast('❌ 送信エラー', 'err');
-        }
       }
 
       function patrolToast(msg, type) {
@@ -3096,7 +3233,12 @@
         closeCamera();                 // カメラを閉じて巡回画面へ戻す（トーストを見せるため）
         patrolToast('📡 送信中...', '');
 
-        const msg = `📍 ${kp}\n⚠️ その他異常\n🕐 ${date} ${time}\n👤 ${user}` + _locLinesFrom(shotLat, shotLng);
+        const event = patrolKind || 'その他異常';
+        const lane  = patrolDirection ? '（' + patrolDirection + '）' : '';
+        // 手入力のときはその距離標の位置、それ以外は撮影した場所
+        const c = patrolManualKP ? _kpToLatLng(patrolManualKP) : null;
+        const locLines = c ? _locLinesFrom(c.lat, c.lng) : _locLinesFrom(shotLat, shotLng);
+        const msg = `📍 ${kp}\n⚠️ ${event}${lane}\n🕐 ${date} ${time}\n👤 ${user}` + locLines;
         try {
           await fetch(PATROL_GAS_URL, {
             method: 'POST',
@@ -3106,7 +3248,8 @@
               type: 'line_image',
               message: msg,
               route: _routeName(),
-              kp, event: 'その他異常', date, time, user,
+              direction: patrolDirection,
+              kp, event: event, date, time, user,
               image: base64, mimeType: 'image/jpeg'
             })
           });
