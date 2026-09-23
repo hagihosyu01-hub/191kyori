@@ -1668,8 +1668,9 @@
           shareButtonHtml +
           (siteUrl ? '<a href="' + siteUrl + '" target="_top" class="btn-back">🔗 ' + (SETTINGS.siteLabel || siteUrl) + ' 🔗</a>' : '') +
           '<div class="info-box">' +
-          '<span class="info-title">【いろいろ説明 v3.92-E4】</span>' +         
+          '<span class="info-title">【いろいろ説明 v3.93-E4】</span>' +         
           '・周囲の環境により5～10m以上の誤差が生じる場合があります。<br>' +
+          '・v3.93-E4：通常撮影のカメラも広角にしました（落下物の「近景」だけ標準のままです）。<br>' +
           '・v3.92-E4：道路点検を「車線・異常項目（16種類）を選んでから撮影」に変えました。トンネル内の手入力もできます。<br>' +
           '・v3.91-E4：191号の73k800〜101k900と145k400〜146k200の位置を図面PDFの値に更新し、114k100の位置の誤りを直しました。<br>' +
           '・v3.90-E4：古いURLで開いたときは、引っ越しのお知らせだけを表示します。<br>' +
@@ -2300,9 +2301,8 @@
         document.documentElement.appendChild(modal);
         modal.style.display = 'flex';
 
-        _startCameraStream(cameraMode === 'fall'   ? FALL_LENS[fallStep]
-                         : cameraMode === 'patrol' ? 'wide'      // 道路点検は広角
-                         : 'normal');
+        // 落下物は工程ごと（処理前=広角／近景=標準／処理後=広角）、それ以外は広角
+        _startCameraStream(cameraMode === 'fall' ? FALL_LENS[fallStep] : 'wide');
       }
 
       async function capturePhoto() {
