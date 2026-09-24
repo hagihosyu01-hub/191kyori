@@ -962,21 +962,43 @@
         justify-content: center;
       }
 
-      /* 名前選択レイヤー */
-      #patrol-name-layer {
-        display: flex;
+      /* 起動時：名前を選ぶ画面 */
+      #user-gate {
+        display: none;
+        position: fixed;
+        top: 0; left: 0;
+        width: 100vw; height: 100vh;
+        background: #1a1a2e;
+        color: #fff;
+        z-index: 8500;
         flex-direction: column;
         align-items: center;
-        justify-content: center;
-        flex: 1;
-        padding: 6vw;
+        padding: 7vw 5vw 6vw;
+        box-sizing: border-box;
+        overflow-y: auto;
+      }
+      #user-gate h2 {
+        font-size: 5.5vw;
+        margin: 0 0 4vw;
+        text-align: center;
+      }
+      #user-gate-list {
+        width: 100%;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
         gap: 3vw;
       }
-      #patrol-name-layer h2 {
+      .user-gate-btn {
+        padding: 4.5vw 2vw;
+        font-size: 5vw;
+        font-weight: bold;
+        border-radius: 3vw;
+        border: 2px solid #0f3460;
+        background: #16213e;
         color: #fff;
-        font-size: 5.5vw;
-        margin-bottom: 2vw;
+        cursor: pointer;
       }
+      .user-gate-btn:active { background: #0f3460; }
       .patrol-name-btn {
         width: 100%;
         padding: 4.5vw;
@@ -1139,16 +1161,6 @@
         <button id="patrol-close" onclick="closePatrol()">✕</button>
       </div>
 
-      <!-- 名前選択レイヤー -->
-      <div id="patrol-name-layer">
-        <h2><svg class="car-ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="#ffd11a" d="M5 11l1.3-3.9C6.6 6.2 7.4 5.6 8.3 5.6h7.4c.9 0 1.7.6 2 1.5L19 11l1.4.5c.4.1.6.5.6.9V17c0 .6-.4 1-1 1h-1c-.6 0-1-.4-1-1v-1H6v1c0 .6-.4 1-1 1H4c-.6 0-1-.4-1-1v-4.6c0-.4.2-.8.6-.9L5 11z"/><path fill="#fff3b0" d="M7.6 7.6l-.8 3h10.4l-.8-3c-.1-.4-.5-.7-.95-.7H8.55c-.45 0-.85.3-.95.7z"/><circle cx="7.5" cy="15.5" r="1.5" fill="#333"/><circle cx="16.5" cy="15.5" r="1.5" fill="#333"/></svg> 名前を選んでください</h2>
-        <button class="patrol-name-btn" onclick="patrolSelectUser('なかむら')">なかむら</button>
-        <button class="patrol-name-btn" onclick="patrolSelectUser('かみむら')">かみむら</button>
-        <button class="patrol-name-btn" onclick="patrolSelectUser('Aさん')">Aさん</button>
-        <button class="patrol-name-btn" onclick="patrolSelectUser('Bさん')">Bさん</button>
-        <button class="patrol-name-btn" onclick="patrolSelectUser('Cさん')">Cさん</button>
-      </div>
-
       <!-- 名前のあと：手入力・車線・異常項目を選ぶ画面 -->
       <div id="patrol-event-layer">
         <div id="pt-scroll">
@@ -1178,6 +1190,12 @@
         <button id="patrol-start" onclick="patrolSelectStart()" disabled>車線と異常項目を選んでください</button>
         <button id="patrol-change-user" onclick="patrolChangeUser()">▶ 名前を変更</button>
       </div>
+    </div>
+
+    <!-- 起動時：名前を選ぶ画面 -->
+    <div id="user-gate">
+      <h2>👤 名前を選んでください</h2>
+      <div id="user-gate-list"></div>
     </div>
 
     <!-- 巡回点検トースト -->
@@ -1447,18 +1465,34 @@
         if (t) t.textContent = '📷 ' + (S.shootToward || S.downDirection) + 'に向かって撮影';
         document.querySelectorAll('.dir-name-down').forEach(function(e) { e.textContent = '（' + S.downDirection + '）'; });
         document.querySelectorAll('.dir-name-up').forEach(function(e) { e.textContent = '（' + S.upDirection + '）'; });
-        // 道路点検の名前ボタン（settings.json に patrolUsers があれば、その名前で作り直す）
-        if (Array.isArray(S.patrolUsers) && S.patrolUsers.length) {
-          const layer = document.getElementById('patrol-name-layer');
-          layer.querySelectorAll('.patrol-name-btn').forEach(function(b) { b.remove(); });
-          S.patrolUsers.forEach(function(name) {
-            const b = document.createElement('button');
-            b.className = 'patrol-name-btn';
-            b.textContent = name;
-            b.addEventListener('click', function() { patrolSelectUser(name); });
-            layer.appendChild(b);
-          });
-        }
+      }
+
+      // 起動時に選ぶ名前（settings.json の patrolUsers。無ければこの一覧）
+      const DEFAULT_USERS = ['なかむら', 'かみむら', 'よしなが', 'うめつき', 'いわなが',
+                             'ふじた', 'しのはら', 'さいとう', 'はたあな', 'その他'];
+
+      // 名前を選ぶ画面を出す（起動時と「名前を変更」から呼ぶ）
+      function _showUserGate() {
+        const gate = document.getElementById('user-gate');
+        const list = document.getElementById('user-gate-list');
+        const names = (SETTINGS && Array.isArray(SETTINGS.patrolUsers) && SETTINGS.patrolUsers.length)
+          ? SETTINGS.patrolUsers : DEFAULT_USERS;
+        list.innerHTML = '';
+        names.forEach(function(name) {
+          const b = document.createElement('button');
+          b.className = 'user-gate-btn';
+          b.textContent = name;
+          b.addEventListener('click', function() { _pickUser(name); });
+          list.appendChild(b);
+        });
+        gate.style.display = 'flex';
+      }
+
+      function _pickUser(name) {
+        patrolUser = name;
+        const disp = document.getElementById('patrol-user-display');
+        if (disp) disp.textContent = name;
+        document.getElementById('user-gate').style.display = 'none';
       }
 
       let latestKiloPost = "---";
@@ -1470,7 +1504,12 @@
         try {
           await loadRouteData();
           // 古いURLで開かれたときは距離標を出さず、引っ越しのお知らせだけにする（位置情報も使わない）
-          if (_isMovedAway()) { _showMovedPage(); } else { getLocation(); }
+          if (_isMovedAway()) {
+            _showMovedPage();
+          } else {
+            getLocation();      // 名前を選んでいる間に位置情報の取得を始める
+            _showUserGate();    // トップページに入る前に名前を選んでもらう
+          }
         } catch (e) {
           document.getElementById('status').innerHTML =
             '<span style="color:red; font-weight:bold;">距離標データを読み込めません</span><br>' + e.message;
@@ -1668,8 +1707,9 @@
           shareButtonHtml +
           (siteUrl ? '<a href="' + siteUrl + '" target="_top" class="btn-back">🔗 ' + (SETTINGS.siteLabel || siteUrl) + ' 🔗</a>' : '') +
           '<div class="info-box">' +
-          '<span class="info-title">【いろいろ説明 v3.94-E4】</span>' +         
+          '<span class="info-title">【いろいろ説明 v3.95-E4】</span>' +         
           '・周囲の環境により5～10m以上の誤差が生じる場合があります。<br>' +
+          '・v3.95-E4：起動時に名前を選ぶようにしました（道路点検の中の名前選択は無くなりました）。<br>' +
           '・v3.94-E4：落下物の種類を変更しました（動物8種類・物12種類）。<br>' +
           '・v3.93-E4：通常撮影のカメラも広角にしました（落下物の「近景」だけ標準のままです）。<br>' +
           '・v3.92-E4：道路点検を「車線・異常項目（16種類）を選んでから撮影」に変えました。トンネル内の手入力もできます。<br>' +
@@ -2978,13 +3018,7 @@
         modal.style.flexDirection = 'column';
         // KPを反映
         document.getElementById('patrol-kp').textContent = latestKiloPost || '---';
-        // 名前が既に選ばれていればそのまま事象画面へ
-        if (patrolUser) {
-          showPatrolEvents();
-        } else {
-          document.getElementById('patrol-name-layer').style.display = 'flex';
-          document.getElementById('patrol-event-layer').style.display = 'none';
-        }
+        showPatrolEvents();
         patrolStartClock();
       }
 
@@ -2993,20 +3027,13 @@
         if (patrolClockTimer) clearInterval(patrolClockTimer);
       }
 
-      function patrolSelectUser(name) {
-        patrolUser = name;
-        document.getElementById('patrol-user-display').textContent = name;
-        showPatrolEvents();
-      }
-
+      // 名前は起動時に選ぶ。ここからは選び直しの画面を出すだけ
       function patrolChangeUser() {
-        document.getElementById('patrol-name-layer').style.display = 'flex';
-        document.getElementById('patrol-event-layer').style.display = 'none';
+        _showUserGate();
       }
 
       function showPatrolEvents() {
-        document.getElementById('patrol-user-display').textContent = patrolUser;
-        document.getElementById('patrol-name-layer').style.display = 'none';
+        document.getElementById('patrol-user-display').textContent = patrolUser || '---';
         document.getElementById('patrol-event-layer').style.display = 'flex';
         // KPを最新に更新
         document.getElementById('patrol-kp').textContent = latestKiloPost || '---';
