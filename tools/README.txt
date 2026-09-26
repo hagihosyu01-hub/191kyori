@@ -11,7 +11,7 @@
       files/                         図面画像（map_01.webp など）
       deploy.json                    公開先の名前 {"project": "kyori-yamada-kensetsu"}
       icon-192.png                   会社ごとのアイコン（任意）
-    dist/yamada-kensetsu/          ← 組み立て結果（自動で作られる）
+    ..\191距離標作業用\dist\yamada-kensetsu\  ← 組み立て結果（自動で作られる。191kyori の外）
 
 ■ 最初に1回だけ（このパソコンで）
   1) Node.js の「LTS」をインストール（https://nodejs.org）
@@ -31,10 +31,12 @@
 
 ■ Node.js が使えないとき
   python tools/publish.py 会社名 --build-only
-    → dist/会社名.zip ができるので、Cloudflare の画面
+    → 191距離標作業用\dist\会社名.zip ができるので、Cloudflare の画面
       （Workers & Pages → 作成 → Pages → アセットをアップロード）から上げる
 
 ■ 注意
   ・customers/ と dist/ は .gitignore で公開リポジトリに上げないようにしています。
+  ・組み立て結果（dist）は、アップロードに混ざらないよう 191kyori の外の
+    C:\00Claude_sagyou\191距離標作業用\dist\ に作ります。
     パソコンの故障に備えて、customers/ は別の場所（社内の共有フォルダなど）にも控えてください。
   ・萩（R191）の本番は、今までどおり GitHub Pages（data/ フォルダ）で動いています。

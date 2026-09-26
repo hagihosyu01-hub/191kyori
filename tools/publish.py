@@ -7,7 +7,7 @@
 
     python tools/publish.py --new yamada-kensetsu          会社フォルダのひな形を作る
     python tools/publish.py yamada-kensetsu --check        中身の確認だけ
-    python tools/publish.py yamada-kensetsu --build-only   dist/ に組み立てて zip も作る（手でアップロードする場合）
+    python tools/publish.py yamada-kensetsu --build-only   191距離標作業用/dist/ に組み立てて zip も作る（手でアップロードする場合）
     python tools/publish.py yamada-kensetsu --dry-run      組み立てまで行い、公開のコマンドを表示するだけ
     python tools/publish.py yamada-kensetsu                確認 → 組み立て → Cloudflare Pages に公開
     python tools/publish.py --list                         会社の一覧
@@ -19,7 +19,8 @@
     files/               図面画像（map_01.webp など）。サイトの一番上にそのまま置かれます
     icon-192.png         その会社のアイコン（任意。無ければ共通のアイコン）
 
-  customers/ と dist/ は公開リポジトリには上げません（.gitignore 済み）。
+  customers/ は公開リポジトリには上げません（.gitignore 済み）。
+  組み立て結果 dist/ は 191kyori の外（隣の 191距離標作業用/dist/）に作ります。
 """
 import argparse
 import csv
@@ -35,13 +36,12 @@ import zipfile
 
 ROOT      = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CUSTOMERS = os.path.join(ROOT, 'customers')
-DIST      = os.path.join(ROOT, 'dist')
+# 組み立て結果はアップロード用フォルダ（191kyori）の外、隣の作業用フォルダに作る
+DIST      = os.path.join(os.path.dirname(ROOT), '191距離標作業用', 'dist')
 
 # どの会社でも同じもの（プログラム本体と共通の絵）
 CORE_FILES = [
     'index.html', 'service-worker.js', 'icon-192.png',
-    'patrol_pothole.png', 'patrol_debris.png', 'patrol_tree-road.png',
-    'patrol_tree-sight.png', 'patrol_guardrail.png', 'patrol_light.png',
 ]
 REQUIRED  = ['routeName', 'areaName', 'upDirection', 'downDirection', 'workName', 'workNameFall', 'fileSuffix']
 SLUG      = re.compile(r'^[a-z0-9][a-z0-9-]{0,57}$')
@@ -137,6 +137,7 @@ def check(name):
         else:
             iL, iLat, iLng = head.index('label'), head.index('lat'), head.index('lng')
             iMap = head.index('map') if 'map' in head else -1
+            iRoute = head.index('route') if 'route' in head else -1
             bad = []
             for n, row in enumerate(rows[1:], start=2):
                 if not any(c.strip() for c in row):
@@ -151,7 +152,8 @@ def check(name):
                 if not ok:
                     bad.append(n)
                     continue
-                labels.append(label)
+                # 路線が違えば同じ距離標番号があってよいので、路線とセットで数える
+                labels.append((cell(iRoute), label))
                 if KP_LABEL.match(label):
                     kp_labels.append(label)
                 m = cell(iMap)
@@ -303,7 +305,7 @@ def build(info):
 
     n_files = sum(len(fs) for _, _, fs in os.walk(out))
     size = sum(os.path.getsize(os.path.join(d, f)) for d, _, fs in os.walk(out) for f in fs)
-    print('  ✓ 組み立て完了: dist/%s（%d ファイル、%.1f MB）／ 手で上げる用: dist/%s.zip'
+    print('  ✓ 組み立て完了: 191距離標作業用/dist/%s（%d ファイル、%.1f MB）／ 手で上げる用: 191距離標作業用/dist/%s.zip'
           % (name, n_files, size / 1048576, name))
     return out
 
@@ -331,7 +333,7 @@ def deploy(out, project, dry_run=False):
         print('  ✗ Node.js が見つかりません。公開には次の準備が1回だけ必要です：')
         print('    1) https://nodejs.org から「LTS」をインストール')
         print('    2) このフォルダで  npx wrangler login  を実行し、Cloudflare にログイン')
-        print('  すぐに公開したい場合は、dist/ の zip を Cloudflare の画面（Workers & Pages → 作成 → Pages → アップロード）から上げられます')
+        print('  すぐに公開したい場合は、191距離標作業用/dist/ の zip を Cloudflare の画面（Workers & Pages → 作成 → Pages → アップロード）から上げられます')
         return 2
 
     r = run([npx, 'wrangler', 'pages', 'project', 'list'])
