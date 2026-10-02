@@ -1707,8 +1707,9 @@
           shareButtonHtml +
           (siteUrl ? '<a href="' + siteUrl + '" target="_top" class="btn-back">🔗 ' + (SETTINGS.siteLabel || siteUrl) + ' 🔗</a>' : '') +
           '<div class="info-box">' +
-          '<span class="info-title">【いろいろ説明 v3.95-E4】</span>' +         
+          '<span class="info-title">【いろいろ説明 v3.96-E4】</span>' +         
           '・周囲の環境により5～10m以上の誤差が生じる場合があります。<br>' +
+          '・v3.96-E4：道路点検の写真の文字に、車線と異常項目を入れました。<br>' +
           '・v3.95-E4：起動時に名前を選ぶようにしました（道路点検の中の名前選択は無くなりました）。<br>' +
           '・v3.94-E4：落下物の種類を変更しました（動物8種類・物12種類）。<br>' +
           '・v3.93-E4：通常撮影のカメラも広角にしました（落下物の「近景」だけ標準のままです）。<br>' +
@@ -1933,7 +1934,14 @@
           const c = _fallCoords();
           return c ? line1 + '\n(' + c.lat.toFixed(6) + ', ' + c.lng.toFixed(6) + ')' : line1;
         }
-        // 通常撮影・その他異常は従来どおり（日時なし）
+        // 道路点検：車線と異常項目を入れる（--R191_102k100_下り_視認支障木_hagihosyukouji--）
+        if (cameraMode === 'patrol') {
+          let mid = '';
+          if (patrolDirection) mid += '_' + patrolDirection;
+          if (patrolKind)      mid += '_' + patrolKind;
+          return '--' + _routeName() + '_' + _currentKP() + mid + '_' + SETTINGS.workName + '--';
+        }
+        // 通常撮影は従来どおり（日時なし）
         return '--' + _routeName() + '_' + _currentKP() + '_' + SETTINGS.workName + '--';
       }
 
