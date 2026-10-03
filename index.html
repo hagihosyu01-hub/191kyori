@@ -999,8 +999,8 @@
         cursor: pointer;
       }
       .user-gate-btn:active { background: #0f3460; }
-      /* 長い名前はボタンからはみ出さないように小さくする */
-      .user-gate-btn.long { font-size: 4vw; letter-spacing: -0.02em; }
+      /* 長い名前は2列ぶんを使って1行で大きく出す */
+      .user-gate-btn.wide { grid-column: 1 / -1; font-size: 5.6vw; }
       /* 一覧にない人用：名前の手入力 */
       #user-gate-other { width: 100%; margin-top: 5vw; }
       #user-gate-other .ug-label {
@@ -1508,8 +1508,8 @@
       }
 
       // 起動時に選ぶ名前（settings.json の patrolUsers。無ければこの一覧）
-      const DEFAULT_USERS = ['なかむら', 'かみむら', 'よしなが', 'うめつき', 'いわなが', 'ふじた',
-                             'しのはら', 'さいとう', 'はたあな', 'うしろね', 'くまがい', '萩保守協力隊'];
+      const DEFAULT_USERS = ['なかむら', 'かみむら', 'よしなが', 'うめづき', 'いわなが', 'ふじた',
+                             'しのはら', 'さいとう', 'はたあな', 'うしろね', '萩保守協力隊'];
 
       // 名前を選ぶ画面を出す（起動時と「名前を変更」から呼ぶ）
       function _showUserGate() {
@@ -1520,7 +1520,7 @@
         list.innerHTML = '';
         names.forEach(function(name) {
           const b = document.createElement('button');
-          b.className = 'user-gate-btn' + (name.length >= 6 ? ' long' : '');
+          b.className = 'user-gate-btn' + (name.length >= 6 ? ' wide' : '');
           b.textContent = name;
           b.addEventListener('click', function() { _pickUser(name); });
           list.appendChild(b);
@@ -1757,8 +1757,9 @@
           shareButtonHtml +
           (siteUrl ? '<a href="' + siteUrl + '" target="_top" class="btn-back">🔗 ' + (SETTINGS.siteLabel || siteUrl) + ' 🔗</a>' : '') +
           '<div class="info-box">' +
-          '<span class="info-title">【いろいろ説明 v3.98-E4】</span>' +         
+          '<span class="info-title">【いろいろ説明 v3.99-E4】</span>' +         
           '・周囲の環境により5～10m以上の誤差が生じる場合があります。<br>' +
+          '・v3.99-E4：名前を11名に変更し、長い名前は横いっぱいに表示します。<br>' +
           '・v3.98-E4：名前の画面で、一覧にない名前を手で入力できるようにしました。<br>' +
           '・v3.97-E4：起動時に選ぶ名前を12名に変更しました。<br>' +
           '・v3.96-E4：道路点検の写真の文字に、車線と異常項目を入れました。<br>' +
