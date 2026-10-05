@@ -797,6 +797,9 @@
         cursor: pointer;
       }
       .fs-grid .fs-btn.fs-long { font-size: 3.9vw; letter-spacing: -0.02em; }
+      /* 安全に関する項目は赤字（選んだときは背景が濃いので白字に戻す） */
+      .fs-btn.safety { color: #ff5a5a; }
+      .fs-btn.safety.sel { color: #fff; }
       .fs-row .fs-btn { font-size: 6vw; padding: 2.2vw 1vw; line-height: 1.2; }
       .fs-row .fs-btn small {
         display: block;
@@ -1757,8 +1760,9 @@
           shareButtonHtml +
           (siteUrl ? '<a href="' + siteUrl + '" target="_top" class="btn-back">🔗 ' + (SETTINGS.siteLabel || siteUrl) + ' 🔗</a>' : '') +
           '<div class="info-box">' +
-          '<span class="info-title">【いろいろ説明 v4.00-E4】</span>' +         
+          '<span class="info-title">【いろいろ説明 v4.01-E4】</span>' +         
           '・周囲の環境により5～10m以上の誤差が生じる場合があります。<br>' +
+          '・v4.01-E4：道路点検の「不安全状態」「不安全行動」を最後に並べ、赤字にしました。<br>' +
           '・v4.00-E4：道路点検の異常項目に「不安全状態」「不安全行動」を追加しました（18項目）。<br>' +
           '・v3.99-E4：名前を11名に変更し、長い名前は横いっぱいに表示します。<br>' +
           '・v3.98-E4：名前の画面で、一覧にない名前を手で入力できるようにしました。<br>' +
@@ -3066,8 +3070,10 @@
         '視認支障木', '土砂・落石', '法面異常',
         '排水異常', '側溝蓋等異常', '防護柵異常',
         'デリネータ等異常', '標識異常', '照明異常',
-        '不安全状態', '不安全行動', 'その他異常'
+        'その他異常', '不安全状態', '不安全行動'
       ];
+      // 赤字で出す項目（安全に関するもの）
+      const PATROL_RED = ['不安全状態', '不安全行動'];
       let patrolDirection = '';      // '上り' | '下り'
       let patrolKind = '';           // PATROL_KINDS のどれか
       let patrolManualOpen = false;  // 距離標の手入力欄を開いているか
@@ -3117,7 +3123,8 @@
         if (!box.children.length) {
           PATROL_KINDS.forEach(function(k) {
             const b = document.createElement('button');
-            b.className = 'fs-btn' + (k.length >= 6 ? ' fs-long' : '');
+            b.className = 'fs-btn' + (k.length >= 6 ? ' fs-long' : '')
+                                   + (PATROL_RED.indexOf(k) >= 0 ? ' safety' : '');
             b.dataset.v = k;
             b.textContent = k;
             b.addEventListener('click', function() { patrolPick('kind', b); });
