@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0b1736">
+  <title>萩保守 記録ダッシュボード</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+  <style>
+    :root{--navy:#0b1736;--blue:#1976d2;--orange:#ef6c00;--paper:#fff;--muted:#697386}
+    *{box-sizing:border-box}body{margin:0;background:#eef3f8;color:#182033;font-family:-apple-system,BlinkMacSystemFont,"Yu Gothic","Meiryo",sans-serif}
+    header{padding:18px 18px 14px;background:linear-gradient(135deg,#0b1736,#173b72);color:#fff}
+    header h1{margin:0;font-size:22px}header p{margin:6px 0 0;color:#cfe1ff;font-size:13px}
+    .back{color:#fff;text-decoration:none;font-size:14px;display:inline-block;margin-bottom:10px}
+    main{max-width:1100px;margin:auto;padding:14px}
+    .tabs{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+    .tab{border:0;border-radius:14px;padding:14px;font-size:17px;font-weight:800;color:#fff;cursor:pointer;opacity:.55}
+    .tab.active{opacity:1;box-shadow:0 5px 14px #24334a38;transform:translateY(-1px)}
+    .tab.patrol{background:var(--blue)}.tab.fallen{background:var(--orange)}
+    .summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px}
+    .card{background:var(--paper);border-radius:14px;padding:13px;box-shadow:0 2px 8px #14213d15}
+    .card small{display:block;color:var(--muted);font-weight:700}.card strong{display:block;font-size:24px;margin-top:4px}.card span{font-size:12px;color:var(--muted)}
+    #map{height:min(54vh,560px);min-height:360px;border-radius:16px;box-shadow:0 3px 12px #14213d22;background:#cde6f5}
+    .section-title{font-size:17px;margin:18px 2px 9px}.breakdown{display:flex;gap:7px;flex-wrap:wrap}.chip{background:#fff;border-radius:999px;padding:8px 11px;font-size:13px;box-shadow:0 1px 5px #14213d18}.chip b{margin-left:5px}
+    .records{display:grid;gap:9px}.record{background:#fff;border-radius:13px;padding:12px;border-left:5px solid var(--blue);box-shadow:0 2px 7px #14213d12}.record.fallen{border-left-color:var(--orange)}
+    .record-head{display:flex;justify-content:space-between;gap:8px;font-weight:800}.record-meta{margin-top:5px;font-size:13px;color:#4c586c;line-height:1.55}.record a{display:inline-block;margin:7px 9px 0 0;color:#075fbd;font-weight:700;text-decoration:none}
+    .empty,.error{background:#fff;border-radius:14px;padding:20px;text-align:center;color:var(--muted)}.error{color:#b3261e}
+    .leaflet-popup-content{line-height:1.55}.leaflet-popup-content a{font-weight:bold}
+    @media(max-width:560px){header h1{font-size:19px}.summary{grid-template-columns:1fr 1fr}.summary .card:last-child{grid-column:1/-1}#map{min-height:330px}.record-head{display:block}.record-head span{display:block;margin-top:4px;font-size:12px;color:var(--muted)}}
+  </style>
+</head>
+<body>
+  <header><a class="back" href="./">← 距離標アプリへ戻る</a><h1 id="title">山口県 記録ダッシュボード</h1><p>道路点検と落下物の位置・写真・記録を確認</p></header>
+  <main>
+    <div class="tabs">
+      <button class="tab patrol active" onclick="selectMode('patrol')">🚗 点検バージョン</button>
+      <button class="tab fallen" onclick="selectMode('fallen')">📦 落下物バージョン</button>
+    </div>
+    <div class="summary">
+      <div class="card"><small>記録件数</small><strong id="count">0</strong><span>表示中の記録</span></div>
+      <div class="card"><small>本日の記録</small><strong id="today">0</strong><span id="today-label">今日</span></div>
+      <div class="card"><small>最終更新</small><strong id="updated" style="font-size:16px">---</strong><span>GASから取得</span></div>
+    </div>
+    <div id="map"></div>
+    <h2 class="section-title">項目別</h2><div id="breakdown" class="breakdown"></div>
+    <h2 class="section-title">最新の記録</h2><div id="records" class="records"><div class="empty">読み込み中...</div></div>
+  </main>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script>
+    let settings={}, data={patrol:[],fallen:[]}, mode='patrol', map, markers;
+    const pick=(r,names)=>{for(const n of names){if(r[n]!==undefined&&String(r[n]).trim()!=='')return String(r[n]).trim()}return''};
+    const esc=s=>String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const num=v=>{const n=parseFloat(String(v||'').replace(',','.'));return Number.isFinite(n)?n:null};
+    function initMap(){map=L.map('map',{zoomControl:true}).setView([34.20,131.48],8);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap contributors'}).addTo(map);markers=L.layerGroup().addTo(map)}
+    function normalized(r,type){return{raw:r,date:pick(r,['日付','撮影日']),time:pick(r,['時刻','撮影時刻']),route:pick(r,['路線']),kp:pick(r,['距離標']),lane:pick(r,['車線','方向']),item:type==='patrol'?pick(r,['異常項目','項目']):pick(r,['種類','落下物種類']),comment:pick(r,['コメント','備考']),user:pick(r,['担当者','氏名']),lat:num(pick(r,['緯度','lat','Latitude'])),lng:num(pick(r,['経度','lng','Longitude'])),photo:pick(r,['写真URL','写真','画像URL']),folder:pick(r,['保存フォルダ','フォルダURL','Googleドライブ','DriveURL'])}}
+    function selectMode(next){mode=next;document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x.classList.contains(next)));render()}
+    function render(){const rows=(data[mode]||[]).map(r=>normalized(r,mode));document.getElementById('count').textContent=rows.length;const d=new Date(),today=`${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;document.getElementById('today').textContent=rows.filter(r=>r.date===today).length;document.getElementById('updated').textContent=data.updatedAt||'---';renderMap(rows);renderBreakdown(rows);renderRecords(rows)}
+    function renderMap(rows){markers.clearLayers();const bounds=[];rows.forEach(r=>{if(r.lat===null||r.lng===null||r.lat<33||r.lat>35||r.lng<130||r.lng>133)return;const color=mode==='patrol'?'#1976d2':'#ef6c00';const marker=L.circleMarker([r.lat,r.lng],{radius:8,color:'#fff',weight:2,fillColor:color,fillOpacity:.95});let h=`<b>${esc(r.route)} ${esc(r.kp)}</b><br>${esc(r.lane)} ${esc(r.item)}<br>${esc(r.date)} ${esc(r.time)}`;if(r.comment)h+=`<br>${esc(r.comment)}`;if(r.photo)h+=`<br><a href="${esc(r.photo)}" target="_blank">写真を開く</a>`;if(r.folder)h+=` <a href="${esc(r.folder)}" target="_blank">フォルダー</a>`;marker.bindPopup(h).addTo(markers);bounds.push([r.lat,r.lng])});if(bounds.length)map.fitBounds(bounds,{padding:[25,25],maxZoom:13});else map.setView([34.20,131.48],8)}
+    function renderBreakdown(rows){const counts={};rows.forEach(r=>{const k=r.item||'未設定';counts[k]=(counts[k]||0)+1});const el=document.getElementById('breakdown');el.innerHTML=Object.entries(counts).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<span class="chip">${esc(k)}<b>${v}</b></span>`).join('')||'<div class="empty">記録がありません</div>'}
+    function renderRecords(rows){const el=document.getElementById('records');const sorted=rows.slice().sort((a,b)=>(b.date+b.time).localeCompare(a.date+a.time)).slice(0,100);el.innerHTML=sorted.map(r=>`<article class="record ${mode}"><div class="record-head"><b>${esc(r.route)} ${esc(r.kp)}　${esc(r.item||'未設定')}</b><span>${esc(r.date)} ${esc(r.time)}</span></div><div class="record-meta">${esc(r.lane)}${r.user?'　担当：'+esc(r.user):''}${r.comment?'<br>'+esc(r.comment):''}</div>${r.photo?`<a href="${esc(r.photo)}" target="_blank">📷 写真</a>`:''}${r.folder?`<a href="${esc(r.folder)}" target="_blank">📁 保存先</a>`:''}</article>`).join('')||'<div class="empty">記録がありません</div>'}
+    function loadDashboard(){return new Promise((resolve,reject)=>{const cb='dashboardCallback_'+Date.now();window[cb]=payload=>{delete window[cb];script.remove();payload.ok?resolve(payload):reject(new Error(payload.error||'取得に失敗'))};const script=document.createElement('script');script.onerror=()=>reject(new Error('GASに接続できません'));script.src=settings.gasUrl+'?action=dashboard&callback='+encodeURIComponent(cb)+'&t='+Date.now();document.head.appendChild(script)})}
+    (async()=>{try{settings=await fetch('data/settings.json',{cache:'no-cache'}).then(r=>r.json());document.getElementById('title').textContent=(settings.areaName||'山口県')+' 記録ダッシュボード';initMap();data=await loadDashboard();render()}catch(e){if(!map)initMap();document.getElementById('records').innerHTML='<div class="error">記録を読み込めませんでした。GASを最新版へ更新して再デプロイしてください。<br>'+esc(e.message)+'</div>'}})();
+  </script>
+</body>
+</html>

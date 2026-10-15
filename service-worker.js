@@ -1,7 +1,8 @@
-const CACHE_NAME = 'r191-kp-v33';
+const CACHE_NAME = 'r191-kp-v34';
 const ASSETS = [
   './',
   'manifest.json',
+  'dashboard.html',
   'icon-192.png',
   'data/kp.csv',
   'data/settings.json'

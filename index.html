@@ -1188,6 +1188,22 @@
         width: 100%;
         cursor: pointer;
       }
+      .btn-dashboard {
+        display: block;
+        margin-top: 2.5vw;
+        padding: 2.5vw;
+        background: #1565c0;
+        color: #fff;
+        font-size: 5.2vw;
+        font-weight: bold;
+        border-radius: 1.25vw;
+        box-shadow: 0 0.5vw 0.75vw rgba(0,0,0,0.2);
+        border: none;
+        width: 100%;
+        text-decoration: none;
+        text-align: center;
+        box-sizing: border-box;
+      }
     </style>
   </head>
 
@@ -1755,11 +1771,13 @@
         let mapButtonHtml = "";
         let kpSearchButtonHtml = "";
         let patrolButtonHtml = "";
+        let dashboardButtonHtml = "";
         const CAR_SVG = '<svg class="car-ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="#ffd11a" d="M5 11l1.3-3.9C6.6 6.2 7.4 5.6 8.3 5.6h7.4c.9 0 1.7.6 2 1.5L19 11l1.4.5c.4.1.6.5.6.9V17c0 .6-.4 1-1 1h-1c-.6 0-1-.4-1-1v-1H6v1c0 .6-.4 1-1 1H4c-.6 0-1-.4-1-1v-4.6c0-.4.2-.8.6-.9L5 11z"/><path fill="#fff3b0" d="M7.6 7.6l-.8 3h10.4l-.8-3c-.1-.4-.5-.7-.95-.7H8.55c-.45 0-.85.3-.95.7z"/><circle cx="7.5" cy="15.5" r="1.5" fill="#333"/><circle cx="16.5" cy="15.5" r="1.5" fill="#333"/></svg>';
         const PIN_SVG = '<svg class="pin-ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="#e53935" d="M12 2c-3.9 0-7 3.1-7 7 0 5.2 7 13 7 13s7-7.8 7-13c0-3.9-3.1-7-7-7z"/><circle cx="12" cy="9" r="2.6" fill="#fff"/></svg>';
         cameraButtonHtml = '<button onclick="openCamera()" class="btn-camera">📷 カメラを起動 📷</button>';
         fallButtonHtml = '<button onclick="openFallSelect()" class="btn-camera-fall">📷 落下物を撮影 📷</button>';
         patrolButtonHtml = '<button onclick="openPatrol()" class="btn-patrol">' + CAR_SVG + ' 道路点検 ' + CAR_SVG + '</button>';
+        dashboardButtonHtml = '<a href="dashboard.html" class="btn-dashboard">📊 記録ダッシュボード</a>';
         if (res.status !== "圏外です") {
           mapButtonHtml = '<button onclick="openMapModal()" class="btn-map">' + PIN_SVG + ' 現在位置を表示 ' + PIN_SVG + '</button>';
         }
@@ -1773,6 +1791,7 @@
           '<div class="route-name-wrap"><span class="route-name">' + (res.status === "圏外です" ? 'ーー' : _routeName()) + '</span></div>' +
           '<span class="kilo-post">' + displayStatus + '</span>' +
           drawingHtml +
+          dashboardButtonHtml +
           patrolButtonHtml +
           mapButtonHtml +
           kpSearchButtonHtml +
@@ -1781,8 +1800,9 @@
           shareButtonHtml +
           (siteUrl ? '<a href="' + siteUrl + '" target="_top" class="btn-back">🔗 ' + (SETTINGS.siteLabel || siteUrl) + ' 🔗</a>' : '') +
           '<div class="info-box">' +
-          '<span class="info-title">【いろいろ説明 v4.09-E4】</span>' +         
+          '<span class="info-title">【いろいろ説明 v4.10-E4】</span>' +         
           '・周囲の環境により5～10m以上の誤差が生じる場合があります。<br>' +
+          '・v4.10-E4：山口県地図上で道路点検・落下物の記録を切り替えて確認できるダッシュボードを追加しました。<br>' +
           '・v4.09-E4：「テスト」も本番と同じフォルダ・記録へ保存し、落下物のLINEはDriveリンク付きの1通に統一しました。<br>' +
           '・v4.08-E4：道路点検の選択画面にコメント欄を追加し、LINE・Drive・記録シートへ保存するようにしました。<br>' +
           '・v4.07-E4：道路点検の異常項目に「雑草繁茂」「空洞」を追加しました。<br>' +
