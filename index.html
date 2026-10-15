@@ -1781,8 +1781,9 @@
           shareButtonHtml +
           (siteUrl ? '<a href="' + siteUrl + '" target="_top" class="btn-back">🔗 ' + (SETTINGS.siteLabel || siteUrl) + ' 🔗</a>' : '') +
           '<div class="info-box">' +
-          '<span class="info-title">【いろいろ説明 v4.08-E4】</span>' +         
+          '<span class="info-title">【いろいろ説明 v4.09-E4】</span>' +         
           '・周囲の環境により5～10m以上の誤差が生じる場合があります。<br>' +
+          '・v4.09-E4：「テスト」も本番と同じフォルダ・記録へ保存し、落下物のLINEはDriveリンク付きの1通に統一しました。<br>' +
           '・v4.08-E4：道路点検の選択画面にコメント欄を追加し、LINE・Drive・記録シートへ保存するようにしました。<br>' +
           '・v4.07-E4：道路点検の異常項目に「雑草繁茂」「空洞」を追加しました。<br>' +
           '・v4.06-E4：落下物の車線・種類選択画面でも、GPSに合わせて距離標表示が動くようにしました。<br>' +
@@ -3402,7 +3403,6 @@
               direction: patrolDirection,
               kp, event: event, date, time, user,
               comment: patrolComment,
-              isTest: isTest,
               lat: saveLat, lng: saveLng,
               fileName: fileName,
               image: base64, mimeType: 'image/jpeg'
@@ -3744,7 +3744,7 @@
               mode: 'no-cors',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                type: fallKind === 'テスト' ? 'fallen_object_test' : 'fallen_object',
+                type: 'fallen_object',
                 groupId: fallGroupId,
                 index: i + 1,
                 total: fallShots.length,
@@ -3755,7 +3755,6 @@
                 event: '落下物',
                 direction: fallDirection,
                 kind: fallKind,
-                isTest: fallKind === 'テスト',
                 lat: fallShots[0].lat,
                 lng: fallShots[0].lng,
                 message: (fallKind === 'テスト' ? '【テスト】\n' : '') +
