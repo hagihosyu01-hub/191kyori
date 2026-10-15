@@ -1105,6 +1105,20 @@
         margin-top: 0.8vw;
       }
       #pt-manual-coord:empty { display: none; }
+      #pt-comment {
+        width: 100%;
+        min-height: 18vw;
+        padding: 2.5vw 3vw;
+        box-sizing: border-box;
+        resize: vertical;
+        border: 2px solid #0f3460;
+        border-radius: 2.5vw;
+        background: #fff;
+        color: #111;
+        font-size: 4.2vw;
+        line-height: 1.45;
+      }
+      #pt-comment:focus { outline: none; border-color: #ffd11a; }
       /* 撮影開始ボタン */
       #patrol-start {
         flex-shrink: 0;
@@ -1224,6 +1238,9 @@
 
           <div class="fs-label">異常項目</div>
           <div id="pt-kind" class="fs-grid"></div>
+
+          <label class="fs-label" for="pt-comment">コメント（任意）</label>
+          <textarea id="pt-comment" maxlength="200" placeholder="状況や対応内容などを入力してください"></textarea>
         </div>
         <button id="patrol-start" onclick="patrolSelectStart()" disabled>車線と異常項目を選んでください</button>
         <button id="patrol-change-user" onclick="patrolChangeUser()">▶ 名前を変更</button>
@@ -1764,8 +1781,9 @@
           shareButtonHtml +
           (siteUrl ? '<a href="' + siteUrl + '" target="_top" class="btn-back">🔗 ' + (SETTINGS.siteLabel || siteUrl) + ' 🔗</a>' : '') +
           '<div class="info-box">' +
-          '<span class="info-title">【いろいろ説明 v4.07-E4】</span>' +         
+          '<span class="info-title">【いろいろ説明 v4.08-E4】</span>' +         
           '・周囲の環境により5～10m以上の誤差が生じる場合があります。<br>' +
+          '・v4.08-E4：道路点検の選択画面にコメント欄を追加し、LINE・Drive・記録シートへ保存するようにしました。<br>' +
           '・v4.07-E4：道路点検の異常項目に「雑草繁茂」「空洞」を追加しました。<br>' +
           '・v4.06-E4：落下物の車線・種類選択画面でも、GPSに合わせて距離標表示が動くようにしました。<br>' +
           '・v4.05-E4：距離標はカメラを開くまで固定せず、固定ボタンを押すか1枚撮影した時点で固定するように統一しました。<br>' +
@@ -3101,6 +3119,7 @@
       let patrolManualOpen = false;  // 距離標の手入力欄を開いているか
       let patrolManualKP = '';       // 手入力した距離標（空ならGPSの距離標）
       let patrolManualRoute = '';    // 手入力のときに選んだ路線名
+      let patrolComment = '';        // 道路点検の任意コメント
 
       function openPatrol() {
         const modal = document.getElementById('patrol-modal');
@@ -3134,6 +3153,8 @@
         patrolManualOpen = false;
         patrolManualKP = '';
         patrolManualRoute = '';
+        patrolComment = '';
+        document.getElementById('pt-comment').value = '';
         document.getElementById('pt-manual').style.display = 'none';
         const mt = document.getElementById('pt-manual-toggle');
         mt.textContent = '🚇 トンネル内など：距離標を手入力';
@@ -3259,6 +3280,7 @@
       function patrolSelectStart() {
         if (!patrolDirection || !patrolKind) return;
         if (patrolManualOpen && !patrolManualKP) return;
+        patrolComment = document.getElementById('pt-comment').value.trim();
         closePatrol();
         openCamera('patrol');
       }
@@ -3362,7 +3384,9 @@
         const locLines = c ? _locLinesFrom(c.lat, c.lng) : _locLinesFrom(shotLat, shotLng);
         const isTest = event === 'テスト';
         const msg = (isTest ? '【テスト】\n' : '') +
-          `📍 ${kp}\n⚠️ ${event}${lane}\n🕐 ${date} ${time}\n👤 ${user}` + locLines;
+          `📍 ${kp}\n⚠️ ${event}${lane}` +
+          (patrolComment ? `\n💬 ${patrolComment}` : '') +
+          `\n🕐 ${date} ${time}\n👤 ${user}` + locLines;
         const stamp = date.replace(/\//g, '') + '_' + time.replace(':', '');
         const fileName = _fileRoute() + '_' + _kpFileName(kp) + '_' + stamp + '_' +
           (patrolDirection || '車線不明') + '_' + event + '.jpg';
@@ -3377,6 +3401,7 @@
               route: _routeName(),
               direction: patrolDirection,
               kp, event: event, date, time, user,
+              comment: patrolComment,
               isTest: isTest,
               lat: saveLat, lng: saveLng,
               fileName: fileName,
