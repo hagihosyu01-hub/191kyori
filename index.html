@@ -800,6 +800,9 @@
       /* 安全に関する項目は赤字（選んだときは背景が濃いので白字に戻す） */
       .fs-btn.safety { color: #ff5a5a; }
       .fs-btn.safety.sel { color: #fff; }
+      /* 動作確認用。実際の異常・落下物と見分けやすくする */
+      .fs-btn.test { color: #63d5ff; border-style: dashed; }
+      .fs-btn.test.sel { color: #fff; border-style: solid; }
       .fs-row .fs-btn { font-size: 6vw; padding: 2.2vw 1vw; line-height: 1.2; }
       .fs-row .fs-btn small {
         display: block;
@@ -1760,8 +1763,12 @@
           shareButtonHtml +
           (siteUrl ? '<a href="' + siteUrl + '" target="_top" class="btn-back">🔗 ' + (SETTINGS.siteLabel || siteUrl) + ' 🔗</a>' : '') +
           '<div class="info-box">' +
-          '<span class="info-title">【いろいろ説明 v4.01-E4】</span>' +         
+          '<span class="info-title">【いろいろ説明 v4.05-E4】</span>' +         
           '・周囲の環境により5～10m以上の誤差が生じる場合があります。<br>' +
+          '・v4.05-E4：距離標はカメラを開くまで固定せず、固定ボタンを押すか1枚撮影した時点で固定するように統一しました。<br>' +
+          '・v4.04-E4：「テスト」の写真と記録を、本番とは別の動作確認フォルダ・テスト記録へ分けるようにしました。<br>' +
+          '・v4.03-E4：道路点検の異常項目と落下物種類に「テスト」を追加しました。<br>' +
+          '・v4.02-E4：道路点検の写真をGoogle Driveへ保存し、道路点検記録に写真URL・車線・異常項目・位置情報を記録できるようにしました。<br>' +
           '・v4.01-E4：道路点検の「不安全状態」「不安全行動」を最後に並べ、赤字にしました。<br>' +
           '・v4.00-E4：道路点検の異常項目に「不安全状態」「不安全行動」を追加しました（18項目）。<br>' +
           '・v3.99-E4：名前を11名に変更し、長い名前は横いっぱいに表示します。<br>' +
@@ -2024,7 +2031,8 @@
         { name: '動物（死骸）', kinds: ['シカ', 'クマ', 'イノシシ', 'タヌキ', 'キツネ', '鳥類',
                                          'イヌネコ', '動物その他'] },
         { name: '物',           kinds: ['自動車部品', 'タイヤ', 'タイヤ片', '電化製品', 'プラスチック製品',
-                                         'ビニール類', '木材類', '紙類', '布類', '鉄類', 'ゴミ類', '落下物その他'] }
+                                         'ビニール類', '木材類', '紙類', '布類', '鉄類', 'ゴミ類', '落下物その他'] },
+        { name: '動作確認',     kinds: ['テスト'] }
       ];
       let fallDirection = '';   // '上り' | '下り'
       let fallKind = '';        // FALL_KIND_GROUPS のどれか
@@ -2054,7 +2062,8 @@
             grid.className = 'fs-grid';
             g.kinds.forEach(function(k) {
               const b = document.createElement('button');
-              b.className = 'fs-btn' + (k.length >= 6 ? ' fs-long' : '');
+              b.className = 'fs-btn' + (k.length >= 6 ? ' fs-long' : '')
+                                     + (k === 'テスト' ? ' test' : '');
               b.dataset.v = k;
               b.textContent = k;
               b.onclick = function() { fallSelectPick('kind', b); };
@@ -2419,9 +2428,11 @@
         // 映像がまだ来ていないうちに押された場合は撮らない（真っ黒な写真を防ぐ）
         if (!video.videoWidth || video.readyState < 2) return;
 
-        // 落下物の1枚目を撮った瞬間に距離標を固定（残り2枚も同じ距離標にする）
-        const shotIdx = (fallRetakeIndex !== null) ? fallRetakeIndex : fallStep;
-        if (cameraMode === 'fall' && shotIdx === 0 && !kpLocked && !fallManualKP) toggleKpLock();
+        // 固定ボタンを押していない場合も、1枚目を撮った瞬間に距離標を固定する。
+        // トンネル内などの手入力は、その入力値自体が固定値なのでボタン固定は不要。
+        const manualKpActive = (cameraMode === 'fall' && !!fallManualKP)
+                            || (cameraMode === 'patrol' && !!patrolManualKP);
+        if (!kpLocked && !manualKpActive) toggleKpLock();
 
         // 写真に焼き込む距離標＝送信・ファイル名にも使う値
         capturedKP = _currentKP();
@@ -3070,7 +3081,7 @@
         '視認支障木', '土砂・落石', '法面異常',
         '排水異常', '側溝蓋等異常', '防護柵異常',
         'デリネータ等異常', '標識異常', '照明異常',
-        'その他異常', '不安全状態', '不安全行動'
+        'その他異常', '不安全状態', '不安全行動', 'テスト'
       ];
       // 赤字で出す項目（安全に関するもの）
       const PATROL_RED = ['不安全状態', '不安全行動'];
@@ -3124,7 +3135,8 @@
           PATROL_KINDS.forEach(function(k) {
             const b = document.createElement('button');
             b.className = 'fs-btn' + (k.length >= 6 ? ' fs-long' : '')
-                                   + (PATROL_RED.indexOf(k) >= 0 ? ' safety' : '');
+                                   + (PATROL_RED.indexOf(k) >= 0 ? ' safety' : '')
+                                   + (k === 'テスト' ? ' test' : '');
             b.dataset.v = k;
             b.textContent = k;
             b.addEventListener('click', function() { patrolPick('kind', b); });
@@ -3334,8 +3346,15 @@
         const lane  = patrolDirection ? '（' + patrolDirection + '）' : '';
         // 手入力のときはその距離標の位置、それ以外は撮影した場所
         const c = patrolManualKP ? _kpToLatLng(patrolManualKP) : null;
+        const saveLat = c ? c.lat : shotLat;
+        const saveLng = c ? c.lng : shotLng;
         const locLines = c ? _locLinesFrom(c.lat, c.lng) : _locLinesFrom(shotLat, shotLng);
-        const msg = `📍 ${kp}\n⚠️ ${event}${lane}\n🕐 ${date} ${time}\n👤 ${user}` + locLines;
+        const isTest = event === 'テスト';
+        const msg = (isTest ? '【テスト】\n' : '') +
+          `📍 ${kp}\n⚠️ ${event}${lane}\n🕐 ${date} ${time}\n👤 ${user}` + locLines;
+        const stamp = date.replace(/\//g, '') + '_' + time.replace(':', '');
+        const fileName = _fileRoute() + '_' + _kpFileName(kp) + '_' + stamp + '_' +
+          (patrolDirection || '車線不明') + '_' + event + '.jpg';
         try {
           await fetch(PATROL_GAS_URL, {
             method: 'POST',
@@ -3347,6 +3366,9 @@
               route: _routeName(),
               direction: patrolDirection,
               kp, event: event, date, time, user,
+              isTest: isTest,
+              lat: saveLat, lng: saveLng,
+              fileName: fileName,
               image: base64, mimeType: 'image/jpeg'
             })
           });
@@ -3686,7 +3708,7 @@
               mode: 'no-cors',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                type: 'fallen_object',
+                type: fallKind === 'テスト' ? 'fallen_object_test' : 'fallen_object',
                 groupId: fallGroupId,
                 index: i + 1,
                 total: fallShots.length,
@@ -3697,7 +3719,11 @@
                 event: '落下物',
                 direction: fallDirection,
                 kind: fallKind,
-                message: '📍 ' + kp + '\n🧱 落下物（' + FALL_STEPS[i] + ' ' + (i + 1) + '/' + fallShots.length + '）\n🕐 ' + date + ' ' + time + (user ? '\n👤 ' + user : '') + _locLinesFrom(fallShots[0].lat, fallShots[0].lng),
+                isTest: fallKind === 'テスト',
+                lat: fallShots[0].lat,
+                lng: fallShots[0].lng,
+                message: (fallKind === 'テスト' ? '【テスト】\n' : '') +
+                  '📍 ' + kp + '\n🧱 落下物（' + FALL_STEPS[i] + ' ' + (i + 1) + '/' + fallShots.length + '）\n🕐 ' + date + ' ' + time + (user ? '\n👤 ' + user : '') + _locLinesFrom(fallShots[0].lat, fallShots[0].lng),
                 image: base64,
                 mimeType: 'image/jpeg'
               })
