@@ -1707,6 +1707,7 @@
         lastDisplayedKP = res.status;
         const siteUrl = SETTINGS.siteUrl || '';
         latestKiloPost = res.status;
+        _updateFallSelectKp();
 
         let displayStatus = res.status;
         if (res.status === "圏外です") {
@@ -1763,8 +1764,10 @@
           shareButtonHtml +
           (siteUrl ? '<a href="' + siteUrl + '" target="_top" class="btn-back">🔗 ' + (SETTINGS.siteLabel || siteUrl) + ' 🔗</a>' : '') +
           '<div class="info-box">' +
-          '<span class="info-title">【いろいろ説明 v4.05-E4】</span>' +         
+          '<span class="info-title">【いろいろ説明 v4.07-E4】</span>' +         
           '・周囲の環境により5～10m以上の誤差が生じる場合があります。<br>' +
+          '・v4.07-E4：道路点検の異常項目に「雑草繁茂」「空洞」を追加しました。<br>' +
+          '・v4.06-E4：落下物の車線・種類選択画面でも、GPSに合わせて距離標表示が動くようにしました。<br>' +
           '・v4.05-E4：距離標はカメラを開くまで固定せず、固定ボタンを押すか1枚撮影した時点で固定するように統一しました。<br>' +
           '・v4.04-E4：「テスト」の写真と記録を、本番とは別の動作確認フォルダ・テスト記録へ分けるようにしました。<br>' +
           '・v4.03-E4：道路点検の異常項目と落下物種類に「テスト」を追加しました。<br>' +
@@ -2082,6 +2085,14 @@
 
       function closeFallSelect() {
         document.getElementById('fall-select-modal').style.display = 'none';
+      }
+
+      // 落下物の選択画面でも、手入力中でなければGPSの距離標をリアルタイム表示する
+      function _updateFallSelectKp() {
+        const modal = document.getElementById('fall-select-modal');
+        const line = document.getElementById('fall-select-kp');
+        if (!modal || !line || modal.style.display !== 'flex' || fallManualOpen) return;
+        line.textContent = '距離標 ' + (_currentKP() || '---');
       }
 
       function fallSelectPick(group, btn) {
@@ -3078,7 +3089,7 @@
       const PATROL_KINDS = [
         'ポットホール', '路面損傷', '段差',
         '路肩堆積', '倒木', '通行支障木',
-        '視認支障木', '土砂・落石', '法面異常',
+        '視認支障木', '雑草繁茂', '空洞', '土砂・落石', '法面異常',
         '排水異常', '側溝蓋等異常', '防護柵異常',
         'デリネータ等異常', '標識異常', '照明異常',
         'その他異常', '不安全状態', '不安全行動', 'テスト'
