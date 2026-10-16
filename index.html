@@ -1791,7 +1791,6 @@
           '<div class="route-name-wrap"><span class="route-name">' + (res.status === "圏外です" ? 'ーー' : _routeName()) + '</span></div>' +
           '<span class="kilo-post">' + displayStatus + '</span>' +
           drawingHtml +
-          dashboardButtonHtml +
           patrolButtonHtml +
           mapButtonHtml +
           kpSearchButtonHtml +
@@ -1800,8 +1799,9 @@
           shareButtonHtml +
           (siteUrl ? '<a href="' + siteUrl + '" target="_top" class="btn-back">🔗 ' + (SETTINGS.siteLabel || siteUrl) + ' 🔗</a>' : '') +
           '<div class="info-box">' +
-          '<span class="info-title">【いろいろ説明 v4.10-E4】</span>' +         
+          '<span class="info-title">【いろいろ説明 v4.11-E4】</span>' +         
           '・周囲の環境により5～10m以上の誤差が生じる場合があります。<br>' +
+          '・v4.11-E4：記録ダッシュボードのボタンを更新履歴の下へ移動しました。<br>' +
           '・v4.10-E4：山口県地図上で道路点検・落下物の記録を切り替えて確認できるダッシュボードを追加しました。<br>' +
           '・v4.09-E4：「テスト」も本番と同じフォルダ・記録へ保存し、落下物のLINEはDriveリンク付きの1通に統一しました。<br>' +
           '・v4.08-E4：道路点検の選択画面にコメント欄を追加し、LINE・Drive・記録シートへ保存するようにしました。<br>' +
@@ -1850,7 +1850,8 @@
           '・ver2.3：附図を最新版に更新しました<br>' +          
           '・ver2.5：距離標がリアルタイムで表示されるように改良しました<br>' +
           '・ver2.0：附図が表示できるようになりました。<br>' +
-          '</div>';
+          '</div>' +
+          dashboardButtonHtml;
         setTimeout(function() {
   const kpEl = document.querySelector('.kilo-post');
   const container = document.getElementById('result');
