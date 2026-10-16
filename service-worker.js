@@ -1,4 +1,4 @@
-const CACHE_NAME = 'r191-kp-v41';
+const CACHE_NAME = 'r191-kp-v42';
 const ASSETS = [
   './',
   'manifest.json',
