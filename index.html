@@ -422,6 +422,36 @@
         border-radius: 4px;
         display: block;
       }
+      /* 道路点検：1件につき最大3枚 */
+      #patrol-shot-badge {
+        position: absolute;
+        top: 16px; left: 50%;
+        transform: translateX(-50%);
+        display: none;
+        background: rgba(21,101,192,0.94);
+        color: #fff;
+        font-size: 14px;
+        font-weight: bold;
+        padding: 8px 14px;
+        border-radius: 20px;
+        z-index: 13;
+        white-space: nowrap;
+      }
+      #patrol-thumbs {
+        position: absolute;
+        top: 70px; left: 16px;
+        display: none;
+        flex-direction: column;
+        gap: 6px;
+        z-index: 13;
+      }
+      #patrol-thumbs img {
+        width: 64px;
+        border: 2px solid #fff;
+        border-radius: 4px;
+        display: block;
+      }
+      .btn-cam-add { background: #1565c0; color: #fff; }
       /* 確認画面 */
       #fall-review {
         position: absolute;
@@ -1361,6 +1391,8 @@
         <small id="fall-step-count">1 / 3 枚目</small>
       </div>
       <div id="fall-thumbs"></div>
+      <div id="patrol-shot-badge">道路点検：1 / 3枚目</div>
+      <div id="patrol-thumbs"></div>
 
       <div id="camera-controls">
         <button id="btn-lock" class="btn-cam-action btn-cam-lock" onclick="toggleKpLock()">距離標固定</button>
@@ -1368,6 +1400,7 @@
         <button id="btn-capture" class="btn-cam-capture" onclick="capturePhoto()" title="撮影"></button>
         <button id="btn-save" class="btn-cam-action btn-cam-save" style="display:none;" onclick="savePhoto()">保存/共有</button>
         <button id="btn-patrol-send" class="btn-cam-action btn-cam-save" style="display:none;" onclick="patrolSendPhoto()">送信</button>
+        <button id="btn-patrol-next" class="btn-cam-action btn-cam-add" style="display:none;" onclick="patrolAddPhoto()">写真を追加</button>
         <button id="btn-fall-next" class="btn-cam-action btn-cam-next" style="display:none;" onclick="fallNextStep()">次へ</button>
       </div>
 
@@ -1799,8 +1832,9 @@
           shareButtonHtml +
           (siteUrl ? '<a href="' + siteUrl + '" target="_top" class="btn-back">🔗 ' + (SETTINGS.siteLabel || siteUrl) + ' 🔗</a>' : '') +
           '<div class="info-box">' +
-          '<span class="info-title">【いろいろ説明 v4.18-E4】</span>' +
+          '<span class="info-title">【いろいろ説明 v4.19-E4】</span>' +
           '・周囲の環境により5～10m以上の誤差が生じる場合があります。<br>' +
+          '・v4.19-E4：道路点検を1件につき最大3枚撮影でき、1枚から送信できるようにしました。<br>' +
           '・v4.18-E4：道路点検記録を補修済みに変更し、通常のダッシュボードから除外できるようにしました。<br>' +
           '・v4.17-E4：落下物種類別グラフを「動物（死骸）」「物」の順に分け、色分けしました。<br>' +
           '・v4.16-E4：距離標グラフでブレーク区間（111-1kなど）をそのまま表示するようにしました。<br>' +
@@ -1897,6 +1931,7 @@
       let lockedKP = null;      // 固定時の距離標
       let lockedCoord = null;   // 固定時の緯度経度（落下物の写真の2段目に使う）
       let camKpTimer = null;    // 下部テキストのリアルタイム更新タイマー
+      let patrolShots = [];     // 道路点検の写真（1件につき1～3枚）
 
       // 圏外のときは距離標の代わりに緯度経度を付ける（写真の焼き込み・送信用）
       function _kpWithCoords(kp) {
@@ -2461,11 +2496,15 @@
         document.getElementById('btn-retake').style.display = 'none';
         document.getElementById('btn-save').style.display = 'none';
         document.getElementById('btn-patrol-send').style.display = 'none';
+        document.getElementById('btn-patrol-next').style.display = 'none';
         document.getElementById('btn-fall-next').style.display = 'none';
         document.getElementById('fall-review').style.display = 'none';
         document.getElementById('fall-step-badge').style.display = (cameraMode === 'fall') ? 'block' : 'none';
         document.getElementById('fall-thumbs').style.display = (cameraMode === 'fall') ? 'flex' : 'none';
+        document.getElementById('patrol-shot-badge').style.display = (cameraMode === 'patrol') ? 'block' : 'none';
+        document.getElementById('patrol-thumbs').style.display = (cameraMode === 'patrol') ? 'flex' : 'none';
         if (cameraMode === 'fall') { _fallUpdateBadge(); _fallUpdateThumbs(); }
+        if (cameraMode === 'patrol') { _patrolClearShots(); _patrolUpdateShots(); }
         capturedBlob = null;
         lightMode = 'off';
         torchOn = false;
@@ -2567,11 +2606,13 @@
         document.getElementById('btn-retake').style.display = 'block';
         if (cameraMode === 'patrol') {
           document.getElementById('btn-save').style.display = 'none';
-          document.getElementById('btn-patrol-send').style.display = 'block';
+          document.getElementById('btn-patrol-send').style.display = 'none';
+          document.getElementById('btn-patrol-next').style.display = 'none';
           document.getElementById('btn-fall-next').style.display = 'none';
         } else if (cameraMode === 'fall') {
           document.getElementById('btn-save').style.display = 'none';
           document.getElementById('btn-patrol-send').style.display = 'none';
+          document.getElementById('btn-patrol-next').style.display = 'none';
           const nb = document.getElementById('btn-fall-next');
           nb.style.display = 'block';
           // 撮り直し中は「確定」、通常は「次へ」／3枚目は「確認へ」
@@ -2580,6 +2621,7 @@
         } else {
           document.getElementById('btn-save').style.display = 'block';
           document.getElementById('btn-patrol-send').style.display = 'none';
+          document.getElementById('btn-patrol-next').style.display = 'none';
           document.getElementById('btn-fall-next').style.display = 'none';
         }
 
@@ -2594,7 +2636,19 @@
             date: shotDate,
             width: OUT_W,
             height: OUT_H
-          }).then(function(b) { capturedBlob = b; });
+          }).then(function(b) {
+            capturedBlob = b;
+            if (cameraMode === 'patrol') {
+              const count = patrolShots.length + 1;
+              const send = document.getElementById('btn-patrol-send');
+              const next = document.getElementById('btn-patrol-next');
+              const badge = document.getElementById('patrol-shot-badge');
+              send.textContent = count + '枚で送信';
+              send.style.display = 'block';
+              next.style.display = count < 3 ? 'block' : 'none';
+              if (badge) badge.textContent = '道路点検：' + count + '枚撮影済み（最大3枚）';
+            }
+          });
         }, 'image/jpeg', 0.92);
       }
 
@@ -2612,6 +2666,7 @@
         document.getElementById('btn-retake').style.display = 'none';
         document.getElementById('btn-save').style.display = 'none';
         document.getElementById('btn-patrol-send').style.display = 'none';
+        document.getElementById('btn-patrol-next').style.display = 'none';
         document.getElementById('btn-fall-next').style.display = 'none';
         _startCamKpTimer();   // ライブに戻るため更新再開
         _updateTorchButton();
@@ -3338,12 +3393,65 @@
         t._tm = setTimeout(() => { t.style.display = 'none'; }, 2500);
       }
 
+      function _patrolClearShots() {
+        patrolShots.forEach(function(s) { if (s.url) URL.revokeObjectURL(s.url); });
+        patrolShots = [];
+        const box = document.getElementById('patrol-thumbs');
+        if (box) box.innerHTML = '';
+      }
+
+      function _patrolUpdateShots() {
+        const count = patrolShots.length;
+        const badge = document.getElementById('patrol-shot-badge');
+        if (badge) badge.textContent = '道路点検：' + Math.min(count + 1, 3) + ' / 3枚目（1枚でも送信可）';
+        const box = document.getElementById('patrol-thumbs');
+        if (box) {
+          box.innerHTML = '';
+          patrolShots.forEach(function(s) {
+            const img = document.createElement('img');
+            img.src = s.url;
+            box.appendChild(img);
+          });
+        }
+      }
+
+      function _patrolStoreCurrent() {
+        if (!capturedBlob || patrolShots.length >= 3) return false;
+        patrolShots.push({
+          blob: capturedBlob,
+          url: URL.createObjectURL(capturedBlob),
+          kp: capturedKP || _currentKP() || '不明',
+          lat: capturedLat,
+          lng: capturedLng
+        });
+        capturedBlob = null;
+        capturedKP = null;
+        capturedLat = null;
+        capturedLng = null;
+        _patrolUpdateShots();
+        return true;
+      }
+
+      function patrolAddPhoto() {
+        if (!_patrolStoreCurrent()) return;
+        if (patrolShots.length >= 3) return;
+        retakePhoto();
+        patrolToast('次の写真を撮影してください（' + (patrolShots.length + 1) + '/3）', '');
+      }
+
       function closeCamera() {
         _stopCamKpTimer();
         _resetKpLock();
         cameraMode = 'normal';
         const sendBtn = document.getElementById('btn-patrol-send');
         if (sendBtn) sendBtn.style.display = 'none';
+        const nextBtn = document.getElementById('btn-patrol-next');
+        if (nextBtn) nextBtn.style.display = 'none';
+        ['patrol-shot-badge', 'patrol-thumbs'].forEach(function(id) {
+          const el = document.getElementById(id);
+          if (el) el.style.display = 'none';
+        });
+        _patrolClearShots();
         // 落下物モードの後片付け
         const fallEls = ['btn-fall-next', 'fall-step-badge', 'fall-thumbs', 'fall-review'];
         fallEls.forEach(function(id) {
@@ -3381,10 +3489,11 @@
 
       // 「その他異常」：撮影した写真＋距離標等をGAS経由でLINE送信
       async function patrolSendPhoto() {
-        if (!capturedBlob) return;
-        const kp   = capturedKP || _currentKP() || '不明';   // 写真に焼き込んだ距離標
-        const shotLat = (capturedLat !== null) ? capturedLat : currentGpsLat;
-        const shotLng = (capturedLng !== null) ? capturedLng : currentGpsLng;
+        if (!_patrolStoreCurrent()) return;
+        const shots = patrolShots.slice();
+        const kp = shots[0].kp;
+        const shotLat = (shots[0].lat !== null) ? shots[0].lat : currentGpsLat;
+        const shotLng = (shots[0].lng !== null) ? shots[0].lng : currentGpsLng;
         const now  = new Date();
         const date = now.getFullYear() + '/' +
           String(now.getMonth()+1).padStart(2,'0') + '/' +
@@ -3392,10 +3501,34 @@
         const time = String(now.getHours()).padStart(2,'0') + ':' +
           String(now.getMinutes()).padStart(2,'0');
         const user = patrolUser || '';
+        const route = _routeName();
+        const direction = patrolDirection;
+        const event = patrolKind || 'その他異常';
+        const comment = patrolComment;
+        const c = patrolManualKP ? _kpToLatLng(patrolManualKP) : null;
+        const saveLat = c ? c.lat : shotLat;
+        const saveLng = c ? c.lng : shotLng;
+        const locLines = c ? _locLinesFrom(c.lat, c.lng) : _locLinesFrom(shotLat, shotLng);
+        const lane = direction ? '（' + direction + '）' : '';
+        const isTest = event === 'テスト';
+        const msg = (isTest ? '【テスト】\n' : '') +
+          `📍 ${kp}\n⚠️ ${event}${lane}` +
+          (comment ? `\n💬 ${comment}` : '') +
+          `\n📷 ${shots.length}枚\n🕐 ${date} ${time}\n👤 ${user}` + locLines;
+        const stamp = date.replace(/\//g, '') + '_' + time.replace(':', '');
+        const fileBase = _fileRoute() + '_' + _kpFileName(kp) + '_' + stamp + '_' +
+          (direction || '車線不明') + '_' + event;
 
-        let base64;
+        let images;
         try {
-          base64 = await _blobToBase64(capturedBlob);
+          images = [];
+          for (let i = 0; i < shots.length; i++) {
+            images.push({
+              image: await _blobToBase64(shots[i].blob),
+              mimeType: 'image/jpeg',
+              fileName: fileBase + '_' + (i + 1) + '.jpg'
+            });
+          }
         } catch(e) {
           patrolToast('❌ 画像変換エラー', 'err');
           return;
@@ -3404,21 +3537,6 @@
         closeCamera();                 // カメラを閉じて巡回画面へ戻す（トーストを見せるため）
         patrolToast('📡 送信中...', '');
 
-        const event = patrolKind || 'その他異常';
-        const lane  = patrolDirection ? '（' + patrolDirection + '）' : '';
-        // 手入力のときはその距離標の位置、それ以外は撮影した場所
-        const c = patrolManualKP ? _kpToLatLng(patrolManualKP) : null;
-        const saveLat = c ? c.lat : shotLat;
-        const saveLng = c ? c.lng : shotLng;
-        const locLines = c ? _locLinesFrom(c.lat, c.lng) : _locLinesFrom(shotLat, shotLng);
-        const isTest = event === 'テスト';
-        const msg = (isTest ? '【テスト】\n' : '') +
-          `📍 ${kp}\n⚠️ ${event}${lane}` +
-          (patrolComment ? `\n💬 ${patrolComment}` : '') +
-          `\n🕐 ${date} ${time}\n👤 ${user}` + locLines;
-        const stamp = date.replace(/\//g, '') + '_' + time.replace(':', '');
-        const fileName = _fileRoute() + '_' + _kpFileName(kp) + '_' + stamp + '_' +
-          (patrolDirection || '車線不明') + '_' + event + '.jpg';
         try {
           await fetch(PATROL_GAS_URL, {
             method: 'POST',
@@ -3427,16 +3545,18 @@
             body: JSON.stringify({
               type: 'line_image',
               message: msg,
-              route: _routeName(),
-              direction: patrolDirection,
+              route: route,
+              direction: direction,
               kp, event: event, date, time, user,
-              comment: patrolComment,
+              comment: comment,
               lat: saveLat, lng: saveLng,
-              fileName: fileName,
-              image: base64, mimeType: 'image/jpeg'
+              fileName: images[0].fileName,
+              image: images[0].image,
+              mimeType: 'image/jpeg',
+              images: images
             })
           });
-          patrolToast('✅ 送信しました', 'ok');
+          patrolToast('✅ ' + shots.length + '枚送信しました', 'ok');
         } catch(e) {
           patrolToast('❌ 送信エラー', 'err');
         }
