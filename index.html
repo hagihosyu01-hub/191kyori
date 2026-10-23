@@ -452,6 +452,56 @@
         display: block;
       }
       .btn-cam-add { background: #1565c0; color: #fff; }
+      /* 道路点検：撮影後の対応時期・コメント入力画面 */
+      #patrol-review {
+        position: absolute;
+        inset: 0;
+        display: none;
+        flex-direction: column;
+        background: #1a1a2e;
+        color: #fff;
+        z-index: 15;
+        overflow-y: auto;
+        padding: 5vw;
+        box-sizing: border-box;
+      }
+      #patrol-review h3 { margin: 1vw 0 2vw; font-size: 6vw; text-align: center; }
+      #patrol-review-summary { color: #ffd11a; text-align: center; margin-bottom: 4vw; font-size: 3.8vw; }
+      .patrol-review-label { margin: 3vw 0 2vw; font-size: 4.5vw; font-weight: bold; }
+      #patrol-timing-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 2.5vw; }
+      .patrol-timing-btn {
+        padding: 4vw 2vw;
+        border: 2px solid #2d78c4;
+        border-radius: 3vw;
+        background: #16213e;
+        color: #fff;
+        font-size: 4.2vw;
+        font-weight: bold;
+      }
+      .patrol-timing-btn.sel { background: #1565c0; border-color: #fff; }
+      #patrol-timing-other, #patrol-review-comment {
+        width: 100%;
+        padding: 3vw;
+        box-sizing: border-box;
+        border: 2px solid #0f3460;
+        border-radius: 2.5vw;
+        background: #fff;
+        color: #111;
+        font-size: 4.2vw;
+      }
+      #patrol-timing-other { display: none; margin-top: 2.5vw; }
+      #patrol-review-comment { min-height: 24vw; resize: vertical; line-height: 1.45; }
+      #patrol-review-submit {
+        margin-top: 5vw;
+        padding: 4vw;
+        border: 0;
+        border-radius: 3vw;
+        background: #0d8f3f;
+        color: #fff;
+        font-size: 5.2vw;
+        font-weight: bold;
+      }
+      #patrol-review-submit:disabled { background: #555a70; color: #c8ccd8; }
       /* 確認画面 */
       #fall-review {
         position: absolute;
@@ -1080,6 +1130,38 @@
       }
       .patrol-name-btn:active { background: #0f3460; }
 
+      /* 道路点検を開いた直後：点検のきっかけ選択 */
+      #patrol-trigger-layer {
+        display: none;
+        flex: 1;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 3vw;
+        padding: 6vw 5vw;
+        box-sizing: border-box;
+        color: #fff;
+        background: #1a1a2e;
+      }
+      #patrol-trigger-layer h2 {
+        margin: 0 0 3vw;
+        font-size: 6vw;
+        text-align: center;
+      }
+      .patrol-trigger-btn {
+        width: 100%;
+        padding: 4.5vw 3vw;
+        border: 2px solid #2d78c4;
+        border-radius: 3vw;
+        background: #16213e;
+        color: #fff;
+        font-size: 4.8vw;
+        font-weight: bold;
+        text-align: left;
+        cursor: pointer;
+      }
+      .patrol-trigger-btn:active { background: #0f3460; }
+
       /* 事象ボタンレイヤー */
       #patrol-event-layer {
         display: none;
@@ -1135,20 +1217,6 @@
         margin-top: 0.8vw;
       }
       #pt-manual-coord:empty { display: none; }
-      #pt-comment {
-        width: 100%;
-        min-height: 18vw;
-        padding: 2.5vw 3vw;
-        box-sizing: border-box;
-        resize: vertical;
-        border: 2px solid #0f3460;
-        border-radius: 2.5vw;
-        background: #fff;
-        color: #111;
-        font-size: 4.2vw;
-        line-height: 1.45;
-      }
-      #pt-comment:focus { outline: none; border-color: #ffd11a; }
       /* 撮影開始ボタン */
       #patrol-start {
         flex-shrink: 0;
@@ -1259,7 +1327,16 @@
         <button id="patrol-close" onclick="closePatrol()">✕</button>
       </div>
 
-      <!-- 名前のあと：手入力・車線・異常項目を選ぶ画面 -->
+      <!-- 道路点検を開いた直後：点検のきっかけ -->
+      <div id="patrol-trigger-layer">
+        <h2>点検のきっかけ</h2>
+        <button class="patrol-trigger-btn" onclick="patrolPickTrigger('走行中に発見')">1．走行中に発見</button>
+        <button class="patrol-trigger-btn" onclick="patrolPickTrigger('国交省＋メッセージ')">2．国交省＋メッセージ</button>
+        <button class="patrol-trigger-btn" onclick="patrolPickTrigger('国交省PCメール')">3．国交省PCメール</button>
+        <button class="patrol-trigger-btn" onclick="patrolPickTrigger('国交省定期巡回資料')">4．国交省定期巡回資料</button>
+      </div>
+
+      <!-- きっかけ選択後：手入力・車線・異常項目を選ぶ画面 -->
       <div id="patrol-event-layer">
         <div id="pt-scroll">
           <button id="pt-manual-toggle" onclick="patrolManualToggle()">🚇 トンネル内など：距離標を手入力</button>
@@ -1284,9 +1361,6 @@
 
           <div class="fs-label">異常項目</div>
           <div id="pt-kind" class="fs-grid"></div>
-
-          <label class="fs-label" for="pt-comment">コメント（任意）</label>
-          <textarea id="pt-comment" maxlength="200" placeholder="状況や対応内容などを入力してください"></textarea>
         </div>
         <button id="patrol-start" onclick="patrolSelectStart()" disabled>車線と異常項目を選んでください</button>
         <button id="patrol-change-user" onclick="patrolChangeUser()">▶ 名前を変更</button>
@@ -1402,6 +1476,23 @@
         <button id="btn-patrol-send" class="btn-cam-action btn-cam-save" style="display:none;" onclick="patrolSendPhoto()">送信</button>
         <button id="btn-patrol-next" class="btn-cam-action btn-cam-add" style="display:none;" onclick="patrolAddPhoto()">写真を追加</button>
         <button id="btn-fall-next" class="btn-cam-action btn-cam-next" style="display:none;" onclick="fallNextStep()">次へ</button>
+      </div>
+
+      <!-- 道路点検：撮影後の対応時期・コメント入力 -->
+      <div id="patrol-review">
+        <h3>道路点検の記録</h3>
+        <div id="patrol-review-summary">---</div>
+        <div class="patrol-review-label">対応時期の目安</div>
+        <div id="patrol-timing-buttons">
+          <button class="patrol-timing-btn" onclick="patrolPickTiming('至急', this)">1．至急</button>
+          <button class="patrol-timing-btn" onclick="patrolPickTiming('早期対応', this)">2．早期対応</button>
+          <button class="patrol-timing-btn" onclick="patrolPickTiming('今年度中', this)">3．今年度中</button>
+          <button class="patrol-timing-btn" onclick="patrolPickTiming('その他', this)">4．その他</button>
+        </div>
+        <input id="patrol-timing-other" maxlength="100" placeholder="対応時期を入力してください" oninput="patrolReviewRefresh()">
+        <label class="patrol-review-label" for="patrol-review-comment">コメント（自由記入）</label>
+        <textarea id="patrol-review-comment" maxlength="200" placeholder="状況や対応内容などを入力してください"></textarea>
+        <button id="patrol-review-submit" onclick="patrolSubmitPhotos()" disabled>送信</button>
       </div>
 
       <!-- 落下物モード：3枚そろった後の確認・アップロード画面 -->
@@ -1832,8 +1923,9 @@
           shareButtonHtml +
           (siteUrl ? '<a href="' + siteUrl + '" target="_top" class="btn-back">🔗 ' + (SETTINGS.siteLabel || siteUrl) + ' 🔗</a>' : '') +
           '<div class="info-box">' +
-          '<span class="info-title">【いろいろ説明 v4.19-E4】</span>' +
+          '<span class="info-title">【いろいろ説明 v4.20-E4】</span>' +
           '・周囲の環境により5～10m以上の誤差が生じる場合があります。<br>' +
+          '・v4.20-E4：道路点検の最初に「点検のきっかけ」を選び、撮影後に対応時期とコメントを入力できるようにしました。<br>' +
           '・v4.19-E4：道路点検を1件につき最大3枚撮影でき、1枚から送信できるようにしました。<br>' +
           '・v4.18-E4：道路点検記録を補修済みに変更し、通常のダッシュボードから除外できるようにしました。<br>' +
           '・v4.17-E4：落下物種類別グラフを「動物（死骸）」「物」の順に分け、色分けしました。<br>' +
@@ -2498,6 +2590,10 @@
         document.getElementById('btn-patrol-send').style.display = 'none';
         document.getElementById('btn-patrol-next').style.display = 'none';
         document.getElementById('btn-fall-next').style.display = 'none';
+        document.getElementById('patrol-review').style.display = 'none';
+        patrolSending = false;
+        patrolTiming = '';
+        patrolComment = '';
         document.getElementById('fall-review').style.display = 'none';
         document.getElementById('fall-step-badge').style.display = (cameraMode === 'fall') ? 'block' : 'none';
         document.getElementById('fall-thumbs').style.display = (cameraMode === 'fall') ? 'flex' : 'none';
@@ -2643,7 +2739,7 @@
               const send = document.getElementById('btn-patrol-send');
               const next = document.getElementById('btn-patrol-next');
               const badge = document.getElementById('patrol-shot-badge');
-              send.textContent = count + '枚で送信';
+              send.textContent = '次へ（' + count + '枚）';
               send.style.display = 'block';
               next.style.display = count < 3 ? 'block' : 'none';
               if (badge) badge.textContent = '道路点検：' + count + '枚撮影済み（最大3枚）';
@@ -3204,6 +3300,9 @@
       let patrolManualKP = '';       // 手入力した距離標（空ならGPSの距離標）
       let patrolManualRoute = '';    // 手入力のときに選んだ路線名
       let patrolComment = '';        // 道路点検の任意コメント
+      let patrolTrigger = '';        // 点検のきっかけ
+      let patrolTiming = '';         // 対応時期の目安
+      let patrolSending = false;
 
       function openPatrol() {
         const modal = document.getElementById('patrol-modal');
@@ -3211,13 +3310,29 @@
         modal.style.flexDirection = 'column';
         // KPを反映
         document.getElementById('patrol-kp').textContent = latestKiloPost || '---';
-        showPatrolEvents();
+        showPatrolTriggers();
         patrolStartClock();
       }
 
       function closePatrol() {
         document.getElementById('patrol-modal').style.display = 'none';
+        document.getElementById('patrol-trigger-layer').style.display = 'none';
+        document.getElementById('patrol-event-layer').style.display = 'none';
         if (patrolClockTimer) clearInterval(patrolClockTimer);
+      }
+
+      function showPatrolTriggers() {
+        patrolTrigger = '';
+        document.getElementById('patrol-user-display').textContent = patrolUser || '---';
+        document.getElementById('patrol-kp').textContent = latestKiloPost || '---';
+        document.getElementById('patrol-event-layer').style.display = 'none';
+        document.getElementById('patrol-trigger-layer').style.display = 'flex';
+      }
+
+      function patrolPickTrigger(value) {
+        patrolTrigger = value;
+        document.getElementById('patrol-trigger-layer').style.display = 'none';
+        showPatrolEvents();
       }
 
       // 名前は起動時に選ぶ。ここからは選び直しの画面を出すだけ
@@ -3227,6 +3342,7 @@
 
       function showPatrolEvents() {
         document.getElementById('patrol-user-display').textContent = patrolUser || '---';
+        document.getElementById('patrol-trigger-layer').style.display = 'none';
         document.getElementById('patrol-event-layer').style.display = 'flex';
         // KPを最新に更新
         document.getElementById('patrol-kp').textContent = latestKiloPost || '---';
@@ -3238,7 +3354,7 @@
         patrolManualKP = '';
         patrolManualRoute = '';
         patrolComment = '';
-        document.getElementById('pt-comment').value = '';
+        patrolTiming = '';
         document.getElementById('pt-manual').style.display = 'none';
         const mt = document.getElementById('pt-manual-toggle');
         mt.textContent = '🚇 トンネル内など：距離標を手入力';
@@ -3364,7 +3480,6 @@
       function patrolSelectStart() {
         if (!patrolDirection || !patrolKind) return;
         if (patrolManualOpen && !patrolManualKP) return;
-        patrolComment = document.getElementById('pt-comment').value.trim();
         closePatrol();
         openCamera('patrol');
       }
@@ -3439,6 +3554,44 @@
         patrolToast('次の写真を撮影してください（' + (patrolShots.length + 1) + '/3）', '');
       }
 
+      // 撮影後は、対応時期とコメントを入力する画面へ進む
+      function patrolSendPhoto() {
+        if (!_patrolStoreCurrent()) return;
+        _stopCameraStream();
+        document.getElementById('camera-controls').style.display = 'none';
+        document.getElementById('patrol-shot-badge').style.display = 'none';
+        document.getElementById('patrol-thumbs').style.display = 'none';
+        patrolTiming = '';
+        patrolComment = '';
+        patrolSending = false;
+        document.querySelectorAll('#patrol-timing-buttons .patrol-timing-btn').forEach(function(b) { b.classList.remove('sel'); });
+        document.getElementById('patrol-timing-other').value = '';
+        document.getElementById('patrol-timing-other').style.display = 'none';
+        document.getElementById('patrol-review-comment').value = '';
+        document.getElementById('patrol-review-summary').textContent =
+          _routeName() + ' ' + patrolShots[0].kp + '　' + patrolDirection + '／' + patrolKind + '　写真' + patrolShots.length + '枚';
+        const submit = document.getElementById('patrol-review-submit');
+        submit.disabled = true;
+        submit.textContent = '送信';
+        document.getElementById('patrol-review').style.display = 'flex';
+      }
+
+      function patrolPickTiming(value, btn) {
+        patrolTiming = value;
+        document.querySelectorAll('#patrol-timing-buttons .patrol-timing-btn').forEach(function(b) { b.classList.remove('sel'); });
+        btn.classList.add('sel');
+        const other = document.getElementById('patrol-timing-other');
+        other.style.display = value === 'その他' ? 'block' : 'none';
+        if (value !== 'その他') other.value = '';
+        patrolReviewRefresh();
+        if (value === 'その他') setTimeout(function() { other.focus(); }, 50);
+      }
+
+      function patrolReviewRefresh() {
+        const otherOk = patrolTiming !== 'その他' || !!document.getElementById('patrol-timing-other').value.trim();
+        document.getElementById('patrol-review-submit').disabled = !patrolTiming || !otherOk || patrolSending;
+      }
+
       function closeCamera() {
         _stopCamKpTimer();
         _resetKpLock();
@@ -3447,6 +3600,11 @@
         if (sendBtn) sendBtn.style.display = 'none';
         const nextBtn = document.getElementById('btn-patrol-next');
         if (nextBtn) nextBtn.style.display = 'none';
+        document.getElementById('camera-controls').style.display = 'flex';
+        document.getElementById('patrol-review').style.display = 'none';
+        patrolSending = false;
+        patrolTiming = '';
+        patrolComment = '';
         ['patrol-shot-badge', 'patrol-thumbs'].forEach(function(id) {
           const el = document.getElementById(id);
           if (el) el.style.display = 'none';
@@ -3487,9 +3645,17 @@
         });
       }
 
-      // 「その他異常」：撮影した写真＋距離標等をGAS経由でLINE送信
-      async function patrolSendPhoto() {
-        if (!_patrolStoreCurrent()) return;
+      // 対応時期・コメントを確定し、写真＋距離標等をGAS経由でLINE送信
+      async function patrolSubmitPhotos() {
+        if (patrolSending || !patrolShots.length || !patrolTiming) return;
+        const otherText = document.getElementById('patrol-timing-other').value.trim();
+        if (patrolTiming === 'その他' && !otherText) return;
+        const timing = patrolTiming === 'その他' ? 'その他：' + otherText : patrolTiming;
+        patrolComment = document.getElementById('patrol-review-comment').value.trim();
+        patrolSending = true;
+        patrolReviewRefresh();
+        const submit = document.getElementById('patrol-review-submit');
+        submit.textContent = '送信中...';
         const shots = patrolShots.slice();
         const kp = shots[0].kp;
         const shotLat = (shots[0].lat !== null) ? shots[0].lat : currentGpsLat;
@@ -3505,6 +3671,7 @@
         const direction = patrolDirection;
         const event = patrolKind || 'その他異常';
         const comment = patrolComment;
+        const trigger = patrolTrigger;
         const c = patrolManualKP ? _kpToLatLng(patrolManualKP) : null;
         const saveLat = c ? c.lat : shotLat;
         const saveLng = c ? c.lng : shotLng;
@@ -3513,6 +3680,8 @@
         const isTest = event === 'テスト';
         const msg = (isTest ? '【テスト】\n' : '') +
           `📍 ${kp}\n⚠️ ${event}${lane}` +
+          (trigger ? `\n🔎 ${trigger}` : '') +
+          `\n⏱️ ${timing}` +
           (comment ? `\n💬 ${comment}` : '') +
           `\n📷 ${shots.length}枚\n🕐 ${date} ${time}\n👤 ${user}` + locLines;
         const stamp = date.replace(/\//g, '') + '_' + time.replace(':', '');
@@ -3530,11 +3699,12 @@
             });
           }
         } catch(e) {
+          patrolSending = false;
+          patrolReviewRefresh();
+          submit.textContent = '送信';
           patrolToast('❌ 画像変換エラー', 'err');
           return;
         }
-
-        closeCamera();                 // カメラを閉じて巡回画面へ戻す（トーストを見せるため）
         patrolToast('📡 送信中...', '');
 
         try {
@@ -3548,6 +3718,8 @@
               route: route,
               direction: direction,
               kp, event: event, date, time, user,
+              trigger: trigger,
+              timing: timing,
               comment: comment,
               lat: saveLat, lng: saveLng,
               fileName: images[0].fileName,
@@ -3556,8 +3728,12 @@
               images: images
             })
           });
+          closeCamera();
           patrolToast('✅ ' + shots.length + '枚送信しました', 'ok');
         } catch(e) {
+          patrolSending = false;
+          patrolReviewRefresh();
+          submit.textContent = '再送信';
           patrolToast('❌ 送信エラー', 'err');
         }
       }
