@@ -59,6 +59,8 @@
         display: block;
         font-size: 18vw;       /* 170px から、スマホ画面幅に100%連動するサイズに修正 */
         font-weight: 900;
+        font-family: "Arial Black", "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif;
+        font-synthesis: weight;
         color: #d9534f;
         margin: 2.5vw 0;
         white-space: nowrap;
@@ -466,6 +468,9 @@
         overflow-y: auto;
         padding: 5vw;
         box-sizing: border-box;
+      }
+      #patrol-review, #patrol-review * {
+        font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic", "YuGothic", "Meiryo", "Noto Sans JP", Arial, sans-serif !important;
       }
       #patrol-review h3 { margin: 1vw 0 2vw; font-size: 6vw; text-align: center; }
       #patrol-review-summary { color: #ffd11a; text-align: center; margin-bottom: 4vw; font-size: 3.8vw; }
@@ -1489,6 +1494,7 @@
           <button class="patrol-timing-btn" onclick="patrolPickTiming('至急', this)">至急</button>
           <button class="patrol-timing-btn" onclick="patrolPickTiming('早期対応', this)">早期対応</button>
           <button class="patrol-timing-btn" onclick="patrolPickTiming('今年度中', this)">今年度中</button>
+          <button class="patrol-timing-btn" onclick="patrolPickTiming('ひまなとき', this)">ひまなとき</button>
           <button class="patrol-timing-btn" onclick="patrolPickTiming('その他', this)">その他</button>
         </div>
         <input id="patrol-timing-other" maxlength="100" placeholder="対応時期を入力してください" oninput="patrolReviewRefresh()">
@@ -1925,8 +1931,9 @@
           shareButtonHtml +
           (siteUrl ? '<a href="' + siteUrl + '" target="_top" class="btn-back">🔗 ' + (SETTINGS.siteLabel || siteUrl) + ' 🔗</a>' : '') +
           '<div class="info-box">' +
-          '<span class="info-title">【いろいろ説明 v4.21-E4】</span>' +
+          '<span class="info-title">【いろいろ説明 v4.22-E4】</span>' +
           '・周囲の環境により5～10m以上の誤差が生じる場合があります。<br>' +
+          '・v4.22-E4：道路点検の最後の画面をゴシック体に固定し、対応時期に「ひまなとき」を追加。距離標の英数字を太字に戻しました。<br>' +
           '・v4.21-E4：「点検のきっかけ」を「点検（現地確認）のきっかけ」に変更し、画面の文字をゴシック体に統一しました。<br>' +
           '・v4.20-E4：道路点検の最初に「点検のきっかけ」を選び、撮影後に対応時期とコメントを入力できるようにしました。<br>' +
           '・v4.19-E4：道路点検を1件につき最大3枚撮影でき、1枚から送信できるようにしました。<br>' +
