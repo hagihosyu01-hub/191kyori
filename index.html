@@ -1931,8 +1931,9 @@
           shareButtonHtml +
           (siteUrl ? '<a href="' + siteUrl + '" target="_top" class="btn-back">🔗 ' + (SETTINGS.siteLabel || siteUrl) + ' 🔗</a>' : '') +
           '<div class="info-box">' +
-          '<span class="info-title">【いろいろ説明 v4.22-E4】</span>' +
+          '<span class="info-title">【いろいろ説明 v4.23-E4】</span>' +
           '・周囲の環境により5～10m以上の誤差が生じる場合があります。<br>' +
+          '・v4.23-E4：道路点検の異常項目から「不安全行動」「不安全状態」「テスト」を削除しました。<br>' +
           '・v4.22-E4：道路点検の最後の画面をゴシック体に固定し、対応時期に「ひまなとき」を追加。距離標の英数字を太字に戻しました。<br>' +
           '・v4.21-E4：「点検のきっかけ」を「点検（現地確認）のきっかけ」に変更し、画面の文字をゴシック体に統一しました。<br>' +
           '・v4.20-E4：道路点検の最初に「点検のきっかけ」を選び、撮影後に対応時期とコメントを入力できるようにしました。<br>' +
@@ -3300,10 +3301,8 @@
         '視認支障木', '雑草繁茂', '空洞', '土砂・落石', '法面異常',
         '排水異常', '側溝蓋等異常', '防護柵異常',
         'デリネータ等異常', '標識異常', '照明異常',
-        'その他異常', '不安全状態', '不安全行動', 'テスト'
+        'その他異常'
       ];
-      // 赤字で出す項目（安全に関するもの）
-      const PATROL_RED = ['不安全状態', '不安全行動'];
       let patrolDirection = '';      // '上り' | '下り'
       let patrolKind = '';           // PATROL_KINDS のどれか
       let patrolManualOpen = false;  // 距離標の手入力欄を開いているか
@@ -3376,9 +3375,7 @@
         if (!box.children.length) {
           PATROL_KINDS.forEach(function(k) {
             const b = document.createElement('button');
-            b.className = 'fs-btn' + (k.length >= 6 ? ' fs-long' : '')
-                                   + (PATROL_RED.indexOf(k) >= 0 ? ' safety' : '')
-                                   + (k === 'テスト' ? ' test' : '');
+            b.className = 'fs-btn' + (k.length >= 6 ? ' fs-long' : '');
             b.dataset.v = k;
             b.textContent = k;
             b.addEventListener('click', function() { patrolPick('kind', b); });
@@ -3687,9 +3684,7 @@
         const saveLng = c ? c.lng : shotLng;
         const locLines = c ? _locLinesFrom(c.lat, c.lng) : _locLinesFrom(shotLat, shotLng);
         const lane = direction ? '（' + direction + '）' : '';
-        const isTest = event === 'テスト';
-        const msg = (isTest ? '【テスト】\n' : '') +
-          `📍 ${kp}\n⚠️ ${event}${lane}` +
+        const msg = `📍 ${kp}\n⚠️ ${event}${lane}` +
           (trigger ? `\n🔎 ${trigger}` : '') +
           `\n⏱️ ${timing}` +
           (comment ? `\n💬 ${comment}` : '') +
