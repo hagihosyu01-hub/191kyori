@@ -1489,7 +1489,7 @@
         <button id="btn-capture" class="btn-cam-capture" onclick="capturePhoto()" title="撮影"></button>
         <button id="btn-save" class="btn-cam-action btn-cam-save" style="display:none;" onclick="savePhoto()">保存/共有</button>
         <button id="btn-patrol-send" class="btn-cam-action btn-cam-save" style="display:none;" onclick="patrolSendPhoto()">確認へ</button>
-        <button id="btn-patrol-next" class="btn-cam-action btn-cam-add" style="display:none;" onclick="patrolAddPhoto()">2枚目を撮影</button>
+        <button id="btn-patrol-next" class="btn-cam-action btn-cam-add" style="display:none;" onclick="patrolAddPhoto()">次の撮影</button>
         <button id="btn-fall-next" class="btn-cam-action btn-cam-next" style="display:none;" onclick="fallNextStep()">次へ</button>
       </div>
 
@@ -1941,8 +1941,9 @@
           shareButtonHtml +
           (siteUrl ? '<a href="' + siteUrl + '" target="_top" class="btn-back">🔗 ' + (SETTINGS.siteLabel || siteUrl) + ' 🔗</a>' : '') +
           '<div class="info-box">' +
-          '<span class="info-title">【いろいろ説明 v4.27-E4】</span>' +
+          '<span class="info-title">【いろいろ説明 v4.28-E4】</span>' +
           '・周囲の環境により5～10m以上の誤差が生じる場合があります。<br>' +
+          '・v4.28-E4：道路点検の撮影ボタンを「確認へ」「次の撮影」に変更しました。<br>' +
           '・v4.27-E4：道路点検のアップロード後に受付IDを自動照合し、記録保存とLINE送信の完了を確認できた場合だけ完了表示するようにしました。<br>' +
           '・v4.26-E4：道路点検の各案件に受付IDを付け、通信エラー後に再送しても二重登録されないようにしました。<br>' +
           '・v4.25-E4：道路点検と落下物撮影の写真を1280×960のまま、1枚400KB以内に自動調整するようにしました。<br>' +
@@ -2768,10 +2769,10 @@
             const send = document.getElementById('btn-patrol-send');
             const next = document.getElementById('btn-patrol-next');
             const badge = document.getElementById('patrol-shot-badge');
-            send.textContent = '確認へ（' + count + '枚）';
+            send.textContent = '確認へ';
             send.style.display = 'block';
             next.style.display = (patrolRetakeIndex === null && count < 3) ? 'block' : 'none';
-            next.textContent = (count + 1) + '枚目を撮影';
+            next.textContent = '次の撮影';
             if (badge) badge.textContent = '道路点検：' + count + '枚撮影済み（最大3枚）';
           }
         } catch (e) {
