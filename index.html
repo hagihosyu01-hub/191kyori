@@ -1949,8 +1949,9 @@
           shareButtonHtml +
           (siteUrl ? '<a href="' + siteUrl + '" target="_top" class="btn-back">🔗 ' + (SETTINGS.siteLabel || siteUrl) + ' 🔗</a>' : '') +
           '<div class="info-box">' +
-          '<span class="info-title">【いろいろ説明 v4.29-E4】</span>' +
+          '<span class="info-title">【いろいろ説明 v4.30-E4】</span>' +
           '・周囲の環境により5～10m以上の誤差が生じる場合があります。<br>' +
+          '・v4.30-E4：撮影開始前に、同一路線・同じ上下線・同じ異常項目・距離標前後50mの未完了案件を確認し、重複の可能性を警告するようにしました。<br>' +
           '・v4.29-E4：道路点検の確認画面から写真を追加でき、追加撮影をやめて確認画面に戻れるようにしました。<br>' +
           '・v4.28-E4：道路点検の撮影ボタンを「確認へ」「次の撮影」に変更しました。<br>' +
           '・v4.27-E4：道路点検のアップロード後に受付IDを自動照合し、記録保存とLINE送信の完了を確認できた場合だけ完了表示するようにしました。<br>' +
@@ -3382,6 +3383,7 @@
       let patrolTrigger = '';        // 点検（現地確認）のきっかけ
       let patrolTiming = '';         // 対応時期の目安
       let patrolSending = false;
+      let patrolDuplicateChecking = false;
 
       function openPatrol() {
         const modal = document.getElementById('patrol-modal');
@@ -3554,9 +3556,66 @@
         _fitStartButton(start);
       }
 
-      function patrolSelectStart() {
+      function _patrolDuplicateOnce(route, kp, direction, eventName) {
+        return new Promise(function(resolve) {
+          if (!PATROL_GAS_URL) { resolve([]); return; }
+          const callback = 'patrolDuplicates_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
+          const script = document.createElement('script');
+          let finished = false;
+          const done = function(candidates) {
+            if (finished) return;
+            finished = true;
+            clearTimeout(timer);
+            try { delete window[callback]; } catch (e) { window[callback] = undefined; }
+            if (script.parentNode) script.parentNode.removeChild(script);
+            resolve(Array.isArray(candidates) ? candidates : []);
+          };
+          window[callback] = function(payload) {
+            done(payload && payload.ok ? payload.candidates : []);
+          };
+          script.onerror = function() { done([]); };
+          const sep = PATROL_GAS_URL.indexOf('?') >= 0 ? '&' : '?';
+          script.src = PATROL_GAS_URL + sep +
+            'action=patrol_duplicates&route=' + encodeURIComponent(route || '') +
+            '&kp=' + encodeURIComponent(kp || '') +
+            '&direction=' + encodeURIComponent(direction || '') +
+            '&event=' + encodeURIComponent(eventName || '') +
+            '&callback=' + encodeURIComponent(callback) + '&t=' + Date.now();
+          const timer = setTimeout(function() { done([]); }, 8000);
+          document.head.appendChild(script);
+        });
+      }
+
+      function _patrolDuplicateMessage(candidates) {
+        const rows = candidates.slice(0, 5).map(function(item) {
+          return '・' + (item.date || '日付不明') + '　' +
+            (item.location || item.kp || '場所不明') + '　[' + (item.status || '未対応') + ']';
+        });
+        return '近くに同じ種類の未完了案件があります。\n\n' + rows.join('\n') +
+          '\n\n同じ案件なら「キャンセル」で戻ってください。\n別の案件として登録する場合だけ「OK」を押してください。';
+      }
+
+      async function patrolSelectStart() {
         if (!patrolDirection || !patrolKind) return;
         if (patrolManualOpen && !patrolManualKP) return;
+        if (patrolDuplicateChecking) return;
+
+        const start = document.getElementById('patrol-start');
+        const route = patrolManualRoute || _routeName();
+        const kp = patrolManualKP || latestKiloPost || '';
+        patrolDuplicateChecking = true;
+        if (start) {
+          start.disabled = true;
+          start.textContent = '🔎 近くの未完了案件を確認中...';
+          _fitStartButton(start);
+        }
+        try {
+          const candidates = await _patrolDuplicateOnce(route, kp, patrolDirection, patrolKind);
+          if (candidates.length && !window.confirm(_patrolDuplicateMessage(candidates))) return;
+        } finally {
+          patrolDuplicateChecking = false;
+          _patrolSelectRefresh();
+        }
         closePatrol();
         openCamera('patrol');
       }
