@@ -474,6 +474,14 @@
       }
       #patrol-review h3 { margin: 1vw 0 2vw; font-size: 6vw; text-align: center; }
       #patrol-review-summary { color: #ffd11a; text-align: center; margin-bottom: 4vw; font-size: 3.8vw; }
+      #patrol-review-photos { display: flex; flex-direction: column; gap: 3vw; }
+      .patrol-review-photo { text-align: left; }
+      .patrol-review-photo .cap { margin-bottom: 1vw; font-size: 3.8vw; font-weight: bold; }
+      .patrol-review-photo img { display: block; width: 100%; border-radius: 2vw; }
+      .patrol-review-photo button {
+        margin-top: 1.5vw; padding: 2vw 4vw; border: 0; border-radius: 2vw;
+        background: #555; color: #fff; font-size: 3.8vw; font-weight: bold;
+      }
       .patrol-review-label { margin: 3vw 0 2vw; font-size: 4.5vw; font-weight: bold; }
       #patrol-timing-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 2.5vw; }
       .patrol-timing-btn {
@@ -1480,8 +1488,8 @@
         <button id="btn-retake" class="btn-cam-action btn-cam-retake" style="display:none;" onclick="retakePhoto()">撮り直し</button>
         <button id="btn-capture" class="btn-cam-capture" onclick="capturePhoto()" title="撮影"></button>
         <button id="btn-save" class="btn-cam-action btn-cam-save" style="display:none;" onclick="savePhoto()">保存/共有</button>
-        <button id="btn-patrol-send" class="btn-cam-action btn-cam-save" style="display:none;" onclick="patrolSendPhoto()">送信</button>
-        <button id="btn-patrol-next" class="btn-cam-action btn-cam-add" style="display:none;" onclick="patrolAddPhoto()">写真を追加</button>
+        <button id="btn-patrol-send" class="btn-cam-action btn-cam-save" style="display:none;" onclick="patrolSendPhoto()">確認へ</button>
+        <button id="btn-patrol-next" class="btn-cam-action btn-cam-add" style="display:none;" onclick="patrolAddPhoto()">2枚目を撮影</button>
         <button id="btn-fall-next" class="btn-cam-action btn-cam-next" style="display:none;" onclick="fallNextStep()">次へ</button>
       </div>
 
@@ -1489,6 +1497,8 @@
       <div id="patrol-review">
         <h3>道路点検の記録</h3>
         <div id="patrol-review-summary">---</div>
+        <div class="patrol-review-label">撮影写真の確認</div>
+        <div id="patrol-review-photos"></div>
         <div class="patrol-review-label">対応時期の目安</div>
         <div id="patrol-timing-buttons">
           <button class="patrol-timing-btn" onclick="patrolPickTiming('至急', this)">至急</button>
@@ -1500,7 +1510,7 @@
         <input id="patrol-timing-other" maxlength="100" placeholder="対応時期を入力してください" oninput="patrolReviewRefresh()">
         <label class="patrol-review-label" for="patrol-review-comment">コメント（自由記入）</label>
         <textarea id="patrol-review-comment" maxlength="200" placeholder="状況や対応内容などを入力してください"></textarea>
-        <button id="patrol-review-submit" onclick="patrolSubmitPhotos()" disabled>送信</button>
+        <button id="patrol-review-submit" onclick="patrolSubmitPhotos()" disabled>☁️ アップロード</button>
       </div>
 
       <!-- 落下物モード：3枚そろった後の確認・アップロード画面 -->
@@ -1931,8 +1941,12 @@
           shareButtonHtml +
           (siteUrl ? '<a href="' + siteUrl + '" target="_top" class="btn-back">🔗 ' + (SETTINGS.siteLabel || siteUrl) + ' 🔗</a>' : '') +
           '<div class="info-box">' +
-          '<span class="info-title">【いろいろ説明 v4.23-E4】</span>' +
+          '<span class="info-title">【いろいろ説明 v4.27-E4】</span>' +
           '・周囲の環境により5～10m以上の誤差が生じる場合があります。<br>' +
+          '・v4.27-E4：道路点検のアップロード後に受付IDを自動照合し、記録保存とLINE送信の完了を確認できた場合だけ完了表示するようにしました。<br>' +
+          '・v4.26-E4：道路点検の各案件に受付IDを付け、通信エラー後に再送しても二重登録されないようにしました。<br>' +
+          '・v4.25-E4：道路点検と落下物撮影の写真を1280×960のまま、1枚400KB以内に自動調整するようにしました。<br>' +
+          '・v4.24-E4：道路点検の確認画面で撮影写真を確認・撮り直しできるようにし、撮影ボタンとアップロード表示を改善しました。<br>' +
           '・v4.23-E4：道路点検の異常項目から「不安全行動」「不安全状態」「テスト」を削除しました。<br>' +
           '・v4.22-E4：道路点検の最後の画面をゴシック体に固定し、対応時期に「ひまなとき」を追加。距離標の英数字を太字に戻しました。<br>' +
           '・v4.21-E4：「点検のきっかけ」を「点検（現地確認）のきっかけ」に変更し、画面の文字をゴシック体に統一しました。<br>' +
@@ -2035,6 +2049,8 @@
       let lockedCoord = null;   // 固定時の緯度経度（落下物の写真の2段目に使う）
       let camKpTimer = null;    // 下部テキストのリアルタイム更新タイマー
       let patrolShots = [];     // 道路点検の写真（1件につき1～3枚）
+      let patrolRetakeIndex = null; // 確認画面から撮り直す写真番号
+      let patrolRecordId = '';  // 二重送信を防ぐ案件固有ID
 
       // 圏外のときは距離標の代わりに緯度経度を付ける（写真の焼き込み・送信用）
       function _kpWithCoords(kp) {
@@ -2611,7 +2627,11 @@
         document.getElementById('patrol-shot-badge').style.display = (cameraMode === 'patrol') ? 'block' : 'none';
         document.getElementById('patrol-thumbs').style.display = (cameraMode === 'patrol') ? 'flex' : 'none';
         if (cameraMode === 'fall') { _fallUpdateBadge(); _fallUpdateThumbs(); }
-        if (cameraMode === 'patrol') { _patrolClearShots(); _patrolUpdateShots(); }
+        if (cameraMode === 'patrol') {
+          _patrolClearShots();
+          patrolRecordId = 'PT' + Date.now() + '_' + Math.floor(Math.random() * 1000000);
+          _patrolUpdateShots();
+        }
         capturedBlob = null;
         lightMode = 'off';
         torchOn = false;
@@ -2738,25 +2758,57 @@
         const shotKP    = capturedKP;
         const shotLat   = capturedLat;
         const shotLng   = capturedLng;
-        canvas.toBlob(function(blob) {
-          _jpegWithExif(blob, {
-            date: shotDate,
-            width: OUT_W,
-            height: OUT_H
-          }).then(function(b) {
-            capturedBlob = b;
-            if (cameraMode === 'patrol') {
-              const count = patrolShots.length + 1;
-              const send = document.getElementById('btn-patrol-send');
-              const next = document.getElementById('btn-patrol-next');
-              const badge = document.getElementById('patrol-shot-badge');
-              send.textContent = '次へ（' + count + '枚）';
-              send.style.display = 'block';
-              next.style.display = count < 3 ? 'block' : 'none';
-              if (badge) badge.textContent = '道路点検：' + count + '枚撮影済み（最大3枚）';
-            }
-          });
-        }, 'image/jpeg', 0.92);
+        try {
+          const exifInfo = { date: shotDate, width: OUT_W, height: OUT_H };
+          capturedBlob = (cameraMode === 'patrol' || cameraMode === 'fall')
+            ? await _canvasJpegUnderLimit(canvas, exifInfo, 400 * 1024)
+            : await _canvasJpegAtQuality(canvas, exifInfo, 0.92);
+          if (cameraMode === 'patrol') {
+            const count = (patrolRetakeIndex !== null) ? patrolShots.length : patrolShots.length + 1;
+            const send = document.getElementById('btn-patrol-send');
+            const next = document.getElementById('btn-patrol-next');
+            const badge = document.getElementById('patrol-shot-badge');
+            send.textContent = '確認へ（' + count + '枚）';
+            send.style.display = 'block';
+            next.style.display = (patrolRetakeIndex === null && count < 3) ? 'block' : 'none';
+            next.textContent = (count + 1) + '枚目を撮影';
+            if (badge) badge.textContent = '道路点検：' + count + '枚撮影済み（最大3枚）';
+          }
+        } catch (e) {
+          capturedBlob = null;
+          patrolToast('❌ 画像の作成に失敗しました', 'err');
+          retakePhoto();
+        }
+      }
+
+      function _canvasJpegAtQuality(canvas, exifInfo, quality) {
+        return new Promise(function(resolve, reject) {
+          canvas.toBlob(function(blob) {
+            if (!blob) { reject(new Error('JPEG作成失敗')); return; }
+            _jpegWithExif(blob, exifInfo).then(resolve, reject);
+          }, 'image/jpeg', quality);
+        });
+      }
+
+      // 1280×960を維持したまま、Exifを含む400KB以内で最も高いJPEG品質を探す
+      async function _canvasJpegUnderLimit(canvas, exifInfo, maxBytes) {
+        let low = 0.08;
+        let high = 0.92;
+        let best = await _canvasJpegAtQuality(canvas, exifInfo, low);
+        if (best.size > maxBytes) {
+          throw new Error('400KB以内に圧縮できません');
+        }
+        for (let i = 0; i < 8; i++) {
+          const quality = (low + high) / 2;
+          const candidate = await _canvasJpegAtQuality(canvas, exifInfo, quality);
+          if (candidate.size <= maxBytes) {
+            best = candidate;
+            low = quality;
+          } else {
+            high = quality;
+          }
+        }
+        return best;
       }
 
       function retakePhoto() {
@@ -3520,6 +3572,9 @@
         patrolShots = [];
         const box = document.getElementById('patrol-thumbs');
         if (box) box.innerHTML = '';
+        const review = document.getElementById('patrol-review-photos');
+        if (review) review.innerHTML = '';
+        patrolRetakeIndex = null;
       }
 
       function _patrolUpdateShots() {
@@ -3538,14 +3593,22 @@
       }
 
       function _patrolStoreCurrent() {
-        if (!capturedBlob || patrolShots.length >= 3) return false;
-        patrolShots.push({
+        if (!capturedBlob || (patrolRetakeIndex === null && patrolShots.length >= 3)) return false;
+        const shot = {
           blob: capturedBlob,
           url: URL.createObjectURL(capturedBlob),
           kp: capturedKP || _currentKP() || '不明',
           lat: capturedLat,
           lng: capturedLng
-        });
+        };
+        if (patrolRetakeIndex !== null) {
+          const old = patrolShots[patrolRetakeIndex];
+          if (old && old.url) URL.revokeObjectURL(old.url);
+          patrolShots[patrolRetakeIndex] = shot;
+          patrolRetakeIndex = null;
+        } else {
+          patrolShots.push(shot);
+        }
         capturedBlob = null;
         capturedKP = null;
         capturedLat = null;
@@ -3561,26 +3624,66 @@
         patrolToast('次の写真を撮影してください（' + (patrolShots.length + 1) + '/3）', '');
       }
 
+      function _patrolRenderReviewPhotos() {
+        const box = document.getElementById('patrol-review-photos');
+        box.innerHTML = '';
+        patrolShots.forEach(function(s, i) {
+          const wrap = document.createElement('div');
+          wrap.className = 'patrol-review-photo';
+          const cap = document.createElement('div');
+          cap.className = 'cap';
+          cap.textContent = (i + 1) + '枚目（' + Math.ceil(s.blob.size / 1024) + 'KB）';
+          const img = document.createElement('img');
+          img.src = s.url;
+          img.alt = '道路点検写真' + (i + 1);
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.textContent = '撮り直し';
+          btn.onclick = function() { patrolReviewRetake(i); };
+          wrap.appendChild(cap);
+          wrap.appendChild(img);
+          wrap.appendChild(btn);
+          box.appendChild(wrap);
+        });
+      }
+
+      function patrolReviewRetake(i) {
+        if (patrolSending || !patrolShots[i]) return;
+        patrolRetakeIndex = i;
+        document.getElementById('patrol-review').style.display = 'none';
+        document.getElementById('camera-controls').style.display = 'flex';
+        document.getElementById('patrol-shot-badge').style.display = 'block';
+        document.getElementById('patrol-thumbs').style.display = 'flex';
+        retakePhoto();
+        _startCameraStream('wide');
+        const badge = document.getElementById('patrol-shot-badge');
+        if (badge) badge.textContent = '道路点検：' + (i + 1) + '枚目を撮り直し中';
+      }
+
       // 撮影後は、対応時期とコメントを入力する画面へ進む
       function patrolSendPhoto() {
+        const wasRetake = patrolRetakeIndex !== null;
         if (!_patrolStoreCurrent()) return;
         _stopCameraStream();
         document.getElementById('camera-controls').style.display = 'none';
         document.getElementById('patrol-shot-badge').style.display = 'none';
         document.getElementById('patrol-thumbs').style.display = 'none';
-        patrolTiming = '';
-        patrolComment = '';
         patrolSending = false;
-        document.querySelectorAll('#patrol-timing-buttons .patrol-timing-btn').forEach(function(b) { b.classList.remove('sel'); });
-        document.getElementById('patrol-timing-other').value = '';
-        document.getElementById('patrol-timing-other').style.display = 'none';
-        document.getElementById('patrol-review-comment').value = '';
+        if (!wasRetake) {
+          patrolTiming = '';
+          patrolComment = '';
+          document.querySelectorAll('#patrol-timing-buttons .patrol-timing-btn').forEach(function(b) { b.classList.remove('sel'); });
+          document.getElementById('patrol-timing-other').value = '';
+          document.getElementById('patrol-timing-other').style.display = 'none';
+          document.getElementById('patrol-review-comment').value = '';
+        }
         document.getElementById('patrol-review-summary').textContent =
           _routeName() + ' ' + patrolShots[0].kp + '　' + patrolDirection + '／' + patrolKind + '　写真' + patrolShots.length + '枚';
+        _patrolRenderReviewPhotos();
         const submit = document.getElementById('patrol-review-submit');
-        submit.disabled = true;
-        submit.textContent = '送信';
+        submit.textContent = '☁️ アップロード';
         document.getElementById('patrol-review').style.display = 'flex';
+        patrolReviewRefresh();
       }
 
       function patrolPickTiming(value, btn) {
@@ -3612,6 +3715,7 @@
         patrolSending = false;
         patrolTiming = '';
         patrolComment = '';
+        patrolRecordId = '';
         ['patrol-shot-badge', 'patrol-thumbs'].forEach(function(id) {
           const el = document.getElementById(id);
           if (el) el.style.display = 'none';
@@ -3652,9 +3756,41 @@
         });
       }
 
-      // 対応時期・コメントを確定し、写真＋距離標等をGAS経由でLINE送信
+      function _patrolReceiptOnce(requestId) {
+        return new Promise(function(resolve) {
+          const callback = 'patrolReceipt_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
+          const script = document.createElement('script');
+          let finished = false;
+          const done = function(value) {
+            if (finished) return;
+            finished = true;
+            clearTimeout(timer);
+            try { delete window[callback]; } catch (e) { window[callback] = undefined; }
+            if (script.parentNode) script.parentNode.removeChild(script);
+            resolve(!!value);
+          };
+          window[callback] = function(payload) { done(payload && payload.ok && payload.complete); };
+          script.onerror = function() { done(false); };
+          const sep = PATROL_GAS_URL.indexOf('?') >= 0 ? '&' : '?';
+          script.src = PATROL_GAS_URL + sep + 'action=patrol_receipt&requestId=' +
+            encodeURIComponent(requestId) + '&callback=' + encodeURIComponent(callback) + '&t=' + Date.now();
+          const timer = setTimeout(function() { done(false); }, 6000);
+          document.head.appendChild(script);
+        });
+      }
+
+      async function _waitPatrolReceipt(requestId) {
+        for (let i = 0; i < 4; i++) {
+          if (await _patrolReceiptOnce(requestId)) return true;
+          if (i < 3) await new Promise(function(resolve) { setTimeout(resolve, 1200); });
+        }
+        return false;
+      }
+
+      // 対応時期・コメントを確定し、写真＋距離標等をGAS経由でアップロード
       async function patrolSubmitPhotos() {
         if (patrolSending || !patrolShots.length || !patrolTiming) return;
+        if (!patrolRecordId) patrolRecordId = 'PT' + Date.now() + '_' + Math.floor(Math.random() * 1000000);
         const otherText = document.getElementById('patrol-timing-other').value.trim();
         if (patrolTiming === 'その他' && !otherText) return;
         const timing = patrolTiming === 'その他' ? 'その他：' + otherText : patrolTiming;
@@ -3662,7 +3798,7 @@
         patrolSending = true;
         patrolReviewRefresh();
         const submit = document.getElementById('patrol-review-submit');
-        submit.textContent = '送信中...';
+        submit.textContent = 'アップロード中...';
         const shots = patrolShots.slice();
         const kp = shots[0].kp;
         const shotLat = (shots[0].lat !== null) ? shots[0].lat : currentGpsLat;
@@ -3706,11 +3842,11 @@
         } catch(e) {
           patrolSending = false;
           patrolReviewRefresh();
-          submit.textContent = '送信';
+          submit.textContent = '☁️ アップロード';
           patrolToast('❌ 画像変換エラー', 'err');
           return;
         }
-        patrolToast('📡 送信中...', '');
+        patrolToast('📡 アップロード中...', '');
 
         try {
           await fetch(PATROL_GAS_URL, {
@@ -3719,6 +3855,7 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               type: 'line_image',
+              requestId: patrolRecordId,
               message: msg,
               route: route,
               direction: direction,
@@ -3733,13 +3870,21 @@
               images: images
             })
           });
-          closeCamera();
-          patrolToast('✅ ' + shots.length + '枚送信しました', 'ok');
         } catch(e) {
+          // GAS側で保存完了後に回答だけ途切れた可能性があるため、下で受付IDを確認する。
+        }
+
+        submit.textContent = '受付確認中...';
+        patrolToast('🔎 受付結果を確認中...', '');
+        const confirmed = await _waitPatrolReceipt(patrolRecordId);
+        if (confirmed) {
+          closeCamera();
+          patrolToast('✅ 登録・LINE送信の完了を確認しました', 'ok');
+        } else {
           patrolSending = false;
           patrolReviewRefresh();
-          submit.textContent = '再送信';
-          patrolToast('❌ 送信エラー', 'err');
+          submit.textContent = '未完了の案件を再開';
+          patrolToast('⚠️ 完了を確認できません。再度押すと同じ受付IDで続きから再開します', 'err');
         }
       }
 
@@ -4012,7 +4157,7 @@
           wrap.className = 'fall-review-item';
           const cap = document.createElement('div');
           cap.className = 'cap';
-          cap.textContent = (i + 1) + '. ' + FALL_STEPS[i];
+          cap.textContent = (i + 1) + '. ' + FALL_STEPS[i] + '（' + Math.ceil(s.blob.size / 1024) + 'KB）';
           const img = document.createElement('img');
           img.src = s.url;
           const btn = document.createElement('button');
