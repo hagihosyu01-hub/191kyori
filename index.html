@@ -1507,15 +1507,17 @@
         <div class="patrol-review-label">撮影写真の確認</div>
         <div id="patrol-review-photos"></div>
         <button id="patrol-review-add" type="button" onclick="patrolReviewAddPhoto()">＋ 写真を追加</button>
-        <div class="patrol-review-label">対応時期の目安</div>
-        <div id="patrol-timing-buttons">
-          <button class="patrol-timing-btn" onclick="patrolPickTiming('至急', this)">至急</button>
-          <button class="patrol-timing-btn" onclick="patrolPickTiming('早期対応', this)">早期対応</button>
-          <button class="patrol-timing-btn" onclick="patrolPickTiming('今年度中', this)">今年度中</button>
-          <button class="patrol-timing-btn" onclick="patrolPickTiming('ひまなとき', this)">ひまなとき</button>
-          <button class="patrol-timing-btn" onclick="patrolPickTiming('その他', this)">その他</button>
+        <div id="patrol-timing-section">
+          <div class="patrol-review-label">対応時期の目安</div>
+          <div id="patrol-timing-buttons">
+            <button class="patrol-timing-btn" onclick="patrolPickTiming('至急', this)">至急</button>
+            <button class="patrol-timing-btn" onclick="patrolPickTiming('早期対応', this)">早期対応</button>
+            <button class="patrol-timing-btn" onclick="patrolPickTiming('今年度中', this)">今年度中</button>
+            <button class="patrol-timing-btn" onclick="patrolPickTiming('ひまなとき', this)">ひまなとき</button>
+            <button class="patrol-timing-btn" onclick="patrolPickTiming('その他', this)">その他</button>
+          </div>
+          <input id="patrol-timing-other" maxlength="100" placeholder="対応時期を入力してください" oninput="patrolReviewRefresh()">
         </div>
-        <input id="patrol-timing-other" maxlength="100" placeholder="対応時期を入力してください" oninput="patrolReviewRefresh()">
         <label class="patrol-review-label" for="patrol-review-comment">コメント（自由記入）</label>
         <textarea id="patrol-review-comment" maxlength="200" placeholder="状況や対応内容などを入力してください"></textarea>
         <button id="patrol-review-submit" onclick="patrolSubmitPhotos()" disabled>☁️ アップロード</button>
@@ -1949,8 +1951,9 @@
           shareButtonHtml +
           (siteUrl ? '<a href="' + siteUrl + '" target="_top" class="btn-back">🔗 ' + (SETTINGS.siteLabel || siteUrl) + ' 🔗</a>' : '') +
           '<div class="info-box">' +
-          '<span class="info-title">【いろいろ説明 v4.31-E4】</span>' +
+          '<span class="info-title">【いろいろ説明 v4.32-E4】</span>' +
           '・周囲の環境により5～10m以上の誤差が生じる場合があります。<br>' +
+          '・v4.32-E4：道路点検の異常項目を「路面損傷・瘤」「倒木・枯れ松」「路肩異常」に変更し、「堆積物」「水たまり」を追加。「点検記録」では対応時期の選択を省略しました。<br>' +
           '・v4.31-E4：道路点検の異常項目に「トラフ異常」「点検記録」を追加しました。<br>' +
           '・v4.30-E4：撮影開始前に、同一路線・同じ上下線・同じ異常項目・距離標前後50mの未完了案件を確認し、重複の可能性を警告するようにしました。<br>' +
           '・v4.29-E4：道路点検の確認画面から写真を追加でき、追加撮影をやめて確認画面に戻れるようにしました。<br>' +
@@ -3368,10 +3371,10 @@
 
       // 道路点検の異常項目
       const PATROL_KINDS = [
-        'ポットホール', '路面損傷', '段差',
-        '路肩堆積', '倒木', '通行支障木',
+        'ポットホール', '路面損傷・瘤', '段差',
+        '路肩異常', '堆積物', '倒木・枯れ松', '通行支障木',
         '視認支障木', '雑草繁茂', '空洞', '土砂・落石', '法面異常',
-        '排水異常', 'トラフ異常', '側溝蓋等異常', '防護柵異常',
+        '排水異常', 'トラフ異常', '水たまり', '側溝蓋等異常', '防護柵異常',
         'デリネータ等異常', '標識異常', '照明異常',
         'その他異常', '点検記録'
       ];
@@ -3776,6 +3779,9 @@
           document.getElementById('patrol-review-comment').value = '';
         }
         patrolReviewOpened = true;
+        const needsTiming = patrolKind !== '点検記録';
+        document.getElementById('patrol-timing-section').style.display = needsTiming ? 'block' : 'none';
+        if (!needsTiming) patrolTiming = '';
         document.getElementById('patrol-review-summary').textContent =
           _routeName() + ' ' + patrolShots[0].kp + '　' + patrolDirection + '／' + patrolKind + '　写真' + patrolShots.length + '枚';
         _patrolRenderReviewPhotos();
@@ -3807,8 +3813,10 @@
       }
 
       function patrolReviewRefresh() {
+        const needsTiming = patrolKind !== '点検記録';
         const otherOk = patrolTiming !== 'その他' || !!document.getElementById('patrol-timing-other').value.trim();
-        document.getElementById('patrol-review-submit').disabled = !patrolTiming || !otherOk || patrolSending;
+        document.getElementById('patrol-review-submit').disabled =
+          (needsTiming && (!patrolTiming || !otherOk)) || patrolSending;
       }
 
       function closeCamera() {
@@ -3901,11 +3909,12 @@
 
       // 対応時期・コメントを確定し、写真＋距離標等をGAS経由でアップロード
       async function patrolSubmitPhotos() {
-        if (patrolSending || !patrolShots.length || !patrolTiming) return;
+        const needsTiming = patrolKind !== '点検記録';
+        if (patrolSending || !patrolShots.length || (needsTiming && !patrolTiming)) return;
         if (!patrolRecordId) patrolRecordId = 'PT' + Date.now() + '_' + Math.floor(Math.random() * 1000000);
         const otherText = document.getElementById('patrol-timing-other').value.trim();
-        if (patrolTiming === 'その他' && !otherText) return;
-        const timing = patrolTiming === 'その他' ? 'その他：' + otherText : patrolTiming;
+        if (needsTiming && patrolTiming === 'その他' && !otherText) return;
+        const timing = !needsTiming ? '' : (patrolTiming === 'その他' ? 'その他：' + otherText : patrolTiming);
         patrolComment = document.getElementById('patrol-review-comment').value.trim();
         patrolSending = true;
         patrolReviewRefresh();
@@ -3934,7 +3943,7 @@
         const lane = direction ? '（' + direction + '）' : '';
         const msg = `📍 ${kp}\n⚠️ ${event}${lane}` +
           (trigger ? `\n🔎 ${trigger}` : '') +
-          `\n⏱️ ${timing}` +
+          (timing ? `\n⏱️ ${timing}` : '') +
           (comment ? `\n💬 ${comment}` : '') +
           `\n📷 ${shots.length}枚\n🕐 ${date} ${time}\n👤 ${user}` + locLines;
         const stamp = date.replace(/\//g, '') + '_' + time.replace(':', '');
